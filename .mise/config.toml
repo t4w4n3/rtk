@@ -1,0 +1,148 @@
+[tools]
+rust = { version = "stable", profile = "default", components = ["rustfmt", "clippy"] }
+
+[env]
+RUST_BACKTRACE = "1"
+RUSTUP_INIT_SKIP_PATH_CHECK = "yes"
+
+# ── Build ──────────────────────────────────────────────────────────────────────
+
+[tasks.build]
+description = "Build debug binary"
+run = "cargo build"
+sources = ["Cargo.toml", "src/**/*.rs", "build.rs", "src/filters/**/*.toml"]
+outputs = ["target/debug/rtk"]
+alias = "b"
+
+[tasks."build:release"]
+description = "Build optimized release binary"
+run = "cargo build --release"
+sources = ["Cargo.toml", "src/**/*.rs", "build.rs", "src/filters/**/*.toml"]
+outputs = ["target/release/rtk"]
+alias = "br"
+
+# ── Quality gates ──────────────────────────────────────────────────────────────
+
+[tasks.fmt]
+description = "Format all Rust code"
+run = "cargo fmt --all"
+
+[tasks."fmt:check"]
+description = "Check formatting without modifying files"
+run = "cargo fmt --all --check"
+
+[tasks.lint]
+description = "Run Clippy on all targets"
+run = "cargo clippy --all-targets -- -D warnings"
+sources = ["Cargo.toml", "src/**/*.rs"]
+
+[tasks.check]
+description = "Fast type-check without building"
+run = "cargo check --all-targets"
+sources = ["Cargo.toml", "src/**/*.rs"]
+alias = "c"
+
+# ── Tests ─────────────────────────────────────────────────────────────────────
+
+[tasks.test]
+description = "Run unit tests"
+run = "cargo test --all"
+sources = ["Cargo.toml", "src/**/*.rs", "tests/**/*"]
+alias = "t"
+
+[tasks."test:verbose"]
+description = "Run unit tests with stdout"
+run = "cargo test --all -- --nocapture"
+
+[tasks."test:smoke"]
+description = "Run smoke tests against installed binary (requires: mise run install)"
+run = "bash scripts/test-all.sh"
+depends = ["build:release"]
+
+[tasks."test:tracking"]
+description = "Run tracking database tests"
+run = "bash scripts/test-tracking.sh"
+
+[tasks."test:watch"]
+description = "Re-run tests on file changes (requires cargo-watch)"
+run = "cargo watch -x 'test --all'"
+
+# ── CI gate ───────────────────────────────────────────────────────────────────
+
+[tasks.ci]
+description = "Full quality gate: fmt:check + lint + test"
+depends = ["fmt:check", "lint", "test"]
+alias = "qa"
+
+[tasks.dev]
+description = "Local quality gate: fmt (auto-fix), then lint + test in parallel"
+run = '''
+cargo fmt --all
+cargo clippy --all-targets -- -D warnings & cargo test --all & wait
+'''
+alias = "d"
+
+# ── Install ───────────────────────────────────────────────────────────────────
+
+[tasks.install]
+description = "Install rtk from source into cargo bin"
+run = "cargo install --path ."
+
+[tasks."install:local"]
+description = "Install release binary directly to PATH (fast, no registry)"
+run = "bash scripts/install-local.sh"
+depends = ["build:release"]
+
+# ── Benchmarks ────────────────────────────────────────────────────────────────
+
+[tasks.bench]
+description = "Run performance benchmarks (requires hyperfine)"
+run = "bash scripts/benchmark.sh"
+depends = ["build:release"]
+
+[tasks."bench:startup"]
+description = "Quick startup time check: rtk vs raw git"
+run = "hyperfine 'target/release/rtk git status' 'git status' --warmup 3"
+depends = ["build:release"]
+
+# ── Analytics ─────────────────────────────────────────────────────────────────
+
+[tasks.gain]
+description = "Show token savings analytics"
+run = "rtk gain"
+
+[tasks."gain:history"]
+description = "Show command usage history with savings"
+run = "rtk gain --history"
+
+# ── Documentation ─────────────────────────────────────────────────────────────
+
+[tasks."docs:update"]
+description = "Update README metrics from real data"
+run = "bash scripts/update-readme-metrics.sh"
+
+[tasks."docs:validate"]
+description = "Validate documentation integrity"
+run = "bash scripts/validate-docs.sh"
+
+# ── Packages ──────────────────────────────────────────────────────────────────
+
+[tasks."package:deb"]
+description = "Build Debian package (requires cargo-deb)"
+run = "cargo deb"
+depends = ["build:release"]
+
+[tasks."package:rpm"]
+description = "Build RPM package (requires cargo-generate-rpm)"
+run = "cargo generate-rpm"
+depends = ["build:release"]
+
+# ── Housekeeping ──────────────────────────────────────────────────────────────
+
+[tasks.clean]
+description = "Remove build artifacts"
+run = "cargo clean"
+
+[tasks."check:install"]
+description = "Verify rtk installation is correct"
+run = "bash scripts/check-installation.sh"
