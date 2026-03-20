@@ -185,6 +185,13 @@ jobs:
           echo "- Require approval from 2 maintainers" >> $GITHUB_STEP_SUMMARY
           echo "- Test in isolated environment before merge" >> $GITHUB_STEP_SUMMARY
 
+  deny:
+    name: Supply Chain Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
   machete:
     name: Unused Dependencies
     runs-on: ubuntu-latest

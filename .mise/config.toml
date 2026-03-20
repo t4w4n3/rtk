@@ -79,9 +79,13 @@ run = "RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --all-features"
 description = "Check for unused dependencies"
 run = "cargo machete"
 
+[tasks.deny]
+description = "Check supply chain security with cargo-deny"
+run = "cargo deny check"
+
 [tasks.ci]
-description = "Full quality gate: fmt:check + lint + test + doc + machete"
-depends = ["fmt:check", "lint", "test", "doc", "machete"]
+description = "Full quality gate: fmt:check + lint + test + doc + machete + deny"
+depends = ["fmt:check", "lint", "test", "doc", "machete", "deny"]
 alias = "qa"
 
 [tasks.dev]
