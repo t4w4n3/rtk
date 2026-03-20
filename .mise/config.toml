@@ -1,5 +1,7 @@
 [tools]
 rust = { version = "stable", profile = "default", components = ["rustfmt", "clippy"] }
+shellcheck = "latest"
+shfmt = "latest"
 
 [env]
 RUST_BACKTRACE = "1"
