@@ -118,6 +118,7 @@ mod lint_cmd;
 mod local_llm;
 mod log_cmd;
 mod ls;
+mod mise_cmd;
 mod mypy_cmd;
 mod next_cmd;
 mod npm_cmd;
@@ -612,6 +613,13 @@ enum Commands {
     Cargo {
         #[command(subcommand)]
         command: CargoCommands,
+    },
+
+    /// mise task runner — resolves task→command and applies the matching RTK filter
+    Mise {
+        /// mise subcommand + task name + extra args (e.g. `run npm-install`)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
     },
 
     /// npm run with filtered output (strip boilerplate)
@@ -1974,6 +1982,10 @@ fn main() -> Result<()> {
             }
         },
 
+        Commands::Mise { args } => {
+            mise_cmd::run(&args, cli.verbose)?;
+        }
+
         Commands::Npm { args } => {
             npm_cmd::run(&args, cli.verbose, cli.skip_env)?;
         }
@@ -2372,6 +2384,7 @@ fn is_operational_command(cmd: &Commands) -> bool {
             | Commands::Prettier { .. }
             | Commands::Playwright { .. }
             | Commands::Cargo { .. }
+            | Commands::Mise { .. }
             | Commands::Npm { .. }
             | Commands::Npx { .. }
             | Commands::Curl { .. }

@@ -568,7 +568,7 @@ fn truncate_line(line: &str, width: usize) -> String {
 }
 
 /// Format porcelain output into compact RTK status display
-fn format_status_output(porcelain: &str) -> String {
+pub(crate) fn format_status_output(porcelain: &str) -> String {
     let lines: Vec<&str> = porcelain.lines().collect();
 
     if lines.is_empty() {
@@ -682,7 +682,7 @@ fn format_status_output(porcelain: &str) -> String {
 }
 
 /// Minimal filtering for git status with user-provided args
-fn filter_status_with_args(output: &str) -> String {
+pub(crate) fn filter_status_with_args(output: &str) -> String {
     let mut result = Vec::new();
 
     for line in output.lines() {

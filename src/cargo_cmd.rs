@@ -554,7 +554,7 @@ fn filter_cargo_nextest(output: &str) -> String {
 }
 
 /// Filter cargo build/check output - strip "Compiling"/"Checking" lines, keep errors + summary
-fn filter_cargo_build(output: &str) -> String {
+pub(crate) fn filter_cargo_build(output: &str) -> String {
     let mut errors: Vec<String> = Vec::new();
     let mut warnings = 0;
     let mut error_count = 0;
@@ -741,7 +741,7 @@ impl AggregatedTestResult {
 }
 
 /// Filter cargo test output - show failures + summary only
-fn filter_cargo_test(output: &str) -> String {
+pub(crate) fn filter_cargo_test(output: &str) -> String {
     let mut failures: Vec<String> = Vec::new();
     let mut summary_lines: Vec<String> = Vec::new();
     let mut in_failure_section = false;

@@ -316,6 +316,12 @@ pub fn package_manager_exec(tool: &str) -> Command {
 /// # Returns
 /// Full path to the resolved binary, or error if not found.
 pub fn resolve_binary(name: &str) -> Result<PathBuf> {
+    // When RTK shims are active (rtk mise run), use the original PATH so that
+    // RTK's own subprocess invocations don't hit the shims and loop infinitely.
+    if let Ok(original_path) = std::env::var("RTK_ORIGINAL_PATH") {
+        return which::which_in(name, Some(original_path), std::env::current_dir()?)
+            .context(format!("Binary '{name}' not found on RTK_ORIGINAL_PATH"));
+    }
     which::which(name).context(format!("Binary '{name}' not found on PATH"))
 }
 
@@ -335,20 +341,20 @@ pub fn resolve_binary(name: &str) -> Result<PathBuf> {
 pub fn resolved_command(name: &str) -> Command {
     match resolve_binary(name) {
         Ok(path) => Command::new(path),
-        Err(e) => {
+        Err(_e) => {
             // On Windows, resolution failure likely means a .CMD/.BAT wrapper
             // wasn't found — always warn so users have a signal.
             // On Unix, this is less common; only log in debug builds.
             #[cfg(target_os = "windows")]
             eprintln!(
                 "rtk: Failed to resolve '{}' via PATH, falling back to direct exec: {}",
-                name, e
+                name, _e
             );
             #[cfg(not(target_os = "windows"))]
             {
                 #[cfg(debug_assertions)]
                 eprintln!(
-                    "rtk: Failed to resolve '{name}' via PATH, falling back to direct exec: {e}"
+                    "rtk: Failed to resolve '{name}' via PATH, falling back to direct exec: {_e}"
                 );
             }
             Command::new(name)
