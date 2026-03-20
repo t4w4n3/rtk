@@ -21,12 +21,10 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
-    "Unicode-DFS-2016",
     "Unicode-3.0",
     "MPL-2.0",
     "CDLA-Permissive-2.0",
     "Zlib",
-    "CC0-1.0",
 ]
 confidence-threshold = 0.8
 
@@ -35,6 +33,35 @@ confidence-threshold = 0.8
 [bans]
 multiple-versions = "warn"
 wildcards = "allow"
+# Known-unresolvable duplicates from transitive dependencies.
+# These come from deps we don't control (dirs, ring, rusqlite, colored, clap)
+# pulling in different generations of the same crate family.
+skip = [
+    # getrandom: 0.2 via dirs+ring, 0.4 via tempfile
+    { crate = "getrandom@0.2.17" },
+    # hashbrown: 0.14 via rusqlite, 0.16 via serde_json+toml
+    { crate = "hashbrown@0.14.5" },
+    # windows-sys family: 0.48 (dirs), 0.52 (ring/rustls), 0.59 (colored), 0.61 (clap)
+    { crate = "windows-sys@0.48.0" },
+    { crate = "windows-sys@0.52.0" },
+    { crate = "windows-sys@0.59.0" },
+    { crate = "windows-targets@0.48.5" },
+    { crate = "windows-targets@0.52.6" },
+    { crate = "windows_aarch64_gnullvm@0.48.5" },
+    { crate = "windows_aarch64_gnullvm@0.52.6" },
+    { crate = "windows_aarch64_msvc@0.48.5" },
+    { crate = "windows_aarch64_msvc@0.52.6" },
+    { crate = "windows_i686_gnu@0.48.5" },
+    { crate = "windows_i686_gnu@0.52.6" },
+    { crate = "windows_i686_msvc@0.48.5" },
+    { crate = "windows_i686_msvc@0.52.6" },
+    { crate = "windows_x86_64_gnu@0.48.5" },
+    { crate = "windows_x86_64_gnu@0.52.6" },
+    { crate = "windows_x86_64_gnullvm@0.48.5" },
+    { crate = "windows_x86_64_gnullvm@0.52.6" },
+    { crate = "windows_x86_64_msvc@0.48.5" },
+    { crate = "windows_x86_64_msvc@0.52.6" },
+]
 deny = [
     { crate = "tokio", reason = "RTK is single-threaded by design; async adds 5-10ms startup overhead" },
     { crate = "async-std", reason = "RTK is single-threaded by design; async adds 5-10ms startup overhead" },
