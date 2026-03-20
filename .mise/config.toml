@@ -71,9 +71,13 @@ run = "cargo watch -x 'test --all'"
 
 # ── CI gate ───────────────────────────────────────────────────────────────────
 
+[tasks.doc]
+description = "Check rustdoc for warnings"
+run = "RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --all-features"
+
 [tasks.ci]
-description = "Full quality gate: fmt:check + lint + test"
-depends = ["fmt:check", "lint", "test"]
+description = "Full quality gate: fmt:check + lint + test + doc"
+depends = ["fmt:check", "lint", "test", "doc"]
 alias = "qa"
 
 [tasks.dev]

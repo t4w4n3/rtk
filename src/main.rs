@@ -242,7 +242,7 @@ enum Commands {
 
     /// Git commands with compact output
     Git {
-        /// Change to directory before executing (like git -C <path>, can be repeated)
+        /// Change to directory before executing (like `git -C <path>`, can be repeated)
         #[arg(short = 'C', action = clap::ArgAction::Append)]
         directory: Vec<String>,
 
