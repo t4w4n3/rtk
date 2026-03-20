@@ -37,8 +37,11 @@ run_fix() {
 # Block the action and send error details back to Claude
 fail() {
 	local label="$1" errors="$2"
-	echo -e "{\"systemMessage\": \"${FIXED:+auto-fixed by $FIXED | }${label}\"}" >&2
-	echo "$errors" >&2
+	# Embed errors inside systemMessage so Claude Code surfaces them.
+	# jq builds valid JSON and escapes newlines/quotes in the error output.
+	local prefix="${FIXED:+auto-fixed by $FIXED | }"
+	jq -n --arg msg "${prefix}${label}" --arg err "$errors" \
+		'{"systemMessage": ($msg + "\n" + $err)}' >&2
 	exit 2
 }
 
