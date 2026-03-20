@@ -1,4 +1,9 @@
 {
+  "env": {
+    "ENABLE_LSP_TOOL": "1",
+    "CLAUDE_CODE_ENABLE_TASKS": "1"
+  },
+  "model": "opusplan",
   "hooks": {
     "PostToolUse": [
       {
@@ -13,5 +18,8 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "rust-analyzer-lsp@claude-plugins-official": true
   }
 }
