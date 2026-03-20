@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt::Write;
 use std::fs;
 use std::path::Path;
 
@@ -12,22 +13,23 @@ fn main() {
 
     let mut files: Vec<_> = fs::read_dir(filters_dir)
         .expect("src/filters/ directory must exist")
-        .filter_map(|e| e.ok())
+        .filter_map(Result::ok)
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "toml"))
         .collect();
 
     // Sort alphabetically for deterministic filter ordering
-    files.sort_by_key(|e| e.file_name());
+    files.sort_by_key(std::fs::DirEntry::file_name);
 
     let mut combined = String::from("schema_version = 1\n\n");
 
     for entry in &files {
         let content = fs::read_to_string(entry.path())
-            .unwrap_or_else(|e| panic!("Failed to read {:?}: {}", entry.path(), e));
-        combined.push_str(&format!(
-            "# --- {} ---\n",
+            .unwrap_or_else(|e| panic!("Failed to read {}: {e}", entry.path().display()));
+        let _ = writeln!(
+            combined,
+            "# --- {} ---",
             entry.file_name().to_string_lossy()
-        ));
+        );
         combined.push_str(&content);
         combined.push_str("\n\n");
     }
@@ -35,8 +37,7 @@ fn main() {
     // Validate: parse the combined TOML to catch errors at build time
     let parsed: toml::Value = combined.parse().unwrap_or_else(|e| {
         panic!(
-            "TOML validation failed for combined filters:\n{}\n\nCheck src/filters/*.toml files",
-            e
+            "TOML validation failed for combined filters:\n{e}\n\nCheck src/filters/*.toml files"
         )
     });
 
@@ -44,12 +45,10 @@ fn main() {
     if let Some(filters) = parsed.get("filters").and_then(|f| f.as_table()) {
         let mut seen: HashSet<String> = HashSet::new();
         for key in filters.keys() {
-            if !seen.insert(key.clone()) {
-                panic!(
-                    "Duplicate filter name '{}' found across src/filters/*.toml files",
-                    key
-                );
-            }
+            assert!(
+                seen.insert(key.clone()),
+                "Duplicate filter name '{key}' found across src/filters/*.toml files"
+            );
         }
     }
 

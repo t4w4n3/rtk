@@ -91,15 +91,12 @@ pub fn run(
                 if has_rtk_disabled_prefix(part) {
                     let actual_cmd = strip_disabled_prefix(part);
                     // Only count if the underlying command is one RTK supports
-                    match classify_command(actual_cmd) {
-                        Classification::Supported { .. } => {
-                            rtk_disabled_count += 1;
-                            let display = truncate_command(actual_cmd);
-                            *rtk_disabled_cmds.entry(display).or_insert(0) += 1;
-                        }
-                        _ => {
-                            // RTK_DISABLED on unsupported/ignored command — not interesting
-                        }
+                    if let Classification::Supported { .. } = classify_command(actual_cmd) {
+                        rtk_disabled_count += 1;
+                        let display = truncate_command(actual_cmd);
+                        *rtk_disabled_cmds.entry(display).or_insert(0) += 1;
+                    } else {
+                        // RTK_DISABLED on unsupported/ignored command — not interesting
                     }
                     continue;
                 }
@@ -142,7 +139,7 @@ pub fn run(
                         let display_name = truncate_command(part);
                         let entry = bucket
                             .command_counts
-                            .entry(format!("{}:{:?}", display_name, status))
+                            .entry(format!("{display_name}:{status:?}"))
                             .or_insert(0);
                         *entry += 1;
                     }
@@ -176,22 +173,24 @@ pub fn run(
                 .command_counts
                 .into_iter()
                 .max_by_key(|(_, c)| *c)
-                .map(|(name, _)| {
-                    // Extract status from "command:Status" format
-                    if let Some(colon_pos) = name.rfind(':') {
-                        let cmd = name[..colon_pos].to_string();
-                        let status_str = &name[colon_pos + 1..];
-                        let status = match status_str {
-                            "Passthrough" => report::RtkStatus::Passthrough,
-                            "NotSupported" => report::RtkStatus::NotSupported,
-                            _ => report::RtkStatus::Existing,
-                        };
-                        (cmd, status)
-                    } else {
-                        (name, report::RtkStatus::Existing)
-                    }
-                })
-                .unwrap_or_else(|| (String::new(), report::RtkStatus::Existing));
+                .map_or_else(
+                    || (String::new(), report::RtkStatus::Existing),
+                    |(name, _)| {
+                        // Extract status from "command:Status" format
+                        if let Some(colon_pos) = name.rfind(':') {
+                            let cmd = name[..colon_pos].to_string();
+                            let status_str = &name[colon_pos + 1..];
+                            let status = match status_str {
+                                "Passthrough" => report::RtkStatus::Passthrough,
+                                "NotSupported" => report::RtkStatus::NotSupported,
+                                _ => report::RtkStatus::Existing,
+                            };
+                            (cmd, status)
+                        } else {
+                            (name, report::RtkStatus::Existing)
+                        }
+                    },
+                );
 
             SupportedEntry {
                 command: command_with_status,
@@ -227,7 +226,7 @@ pub fn run(
         sorted
             .into_iter()
             .take(5)
-            .map(|(cmd, count)| format!("{} ({}x)", cmd, count))
+            .map(|(cmd, count)| format!("{cmd} ({count}x)"))
             .collect()
     };
 

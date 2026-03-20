@@ -26,12 +26,12 @@ pub fn run(filter: Option<String>, require_all: bool) -> Result<()> {
     if total == 0 {
         println!("No inline tests found.");
     } else {
-        println!("{}/{} tests passed", passed, total);
+        println!("{passed}/{total} tests passed");
     }
 
     if require_all && !results.filters_without_tests.is_empty() {
         for name in &results.filters_without_tests {
-            eprintln!("MISSING tests for filter: {}", name);
+            eprintln!("MISSING tests for filter: {name}");
         }
         anyhow::bail!(
             "{} filter(s) have no inline tests (use --require-all in CI)",
@@ -40,7 +40,7 @@ pub fn run(filter: Option<String>, require_all: bool) -> Result<()> {
     }
 
     if failed > 0 {
-        anyhow::bail!("{} test(s) failed", failed);
+        anyhow::bail!("{failed} test(s) failed");
     }
 
     Ok(())

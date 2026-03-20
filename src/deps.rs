@@ -9,7 +9,7 @@ pub fn run(path: &Path, verbose: u8) -> Result<()> {
     let timer = tracking::TimedExecution::start();
 
     let dir = if path.is_file() {
-        path.parent().unwrap_or(Path::new("."))
+        path.parent().unwrap_or_else(|| Path::new("."))
     } else {
         path
     };
@@ -66,7 +66,7 @@ pub fn run(path: &Path, verbose: u8) -> Result<()> {
         rtk.push_str(&format!("No dependency files found in {}", dir.display()));
     }
 
-    print!("{}", rtk);
+    print!("{rtk}");
     timer.track("cat */deps", "rtk deps", &raw, &rtk);
     Ok(())
 }
@@ -88,13 +88,12 @@ fn summarize_cargo_str(path: &Path) -> Result<String> {
                 .map(|m| m.as_str().to_string())
                 .unwrap_or_default();
         } else if let Some(caps) = dep_re.captures(line) {
-            let name = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+            let name = caps.get(1).map_or("", |m| m.as_str());
             let version = caps
                 .get(2)
-                .or(caps.get(3))
-                .map(|m| m.as_str())
-                .unwrap_or("*");
-            let dep = format!("{} ({})", name, version);
+                .or_else(|| caps.get(3))
+                .map_or("*", |m| m.as_str());
+            let dep = format!("{name} ({version})");
             match current_section.as_str() {
                 "dependencies" => deps.push(dep),
                 "dev-dependencies" => dev_deps.push(dep),
@@ -106,7 +105,7 @@ fn summarize_cargo_str(path: &Path) -> Result<String> {
     if !deps.is_empty() {
         out.push_str(&format!("  Dependencies ({}):\n", deps.len()));
         for d in deps.iter().take(10) {
-            out.push_str(&format!("    {}\n", d));
+            out.push_str(&format!("    {d}\n"));
         }
         if deps.len() > 10 {
             out.push_str(&format!("    ... +{} more\n", deps.len() - 10));
@@ -115,7 +114,7 @@ fn summarize_cargo_str(path: &Path) -> Result<String> {
     if !dev_deps.is_empty() {
         out.push_str(&format!("  Dev ({}):\n", dev_deps.len()));
         for d in dev_deps.iter().take(5) {
-            out.push_str(&format!("    {}\n", d));
+            out.push_str(&format!("    {d}\n"));
         }
         if dev_deps.len() > 5 {
             out.push_str(&format!("    ... +{} more\n", dev_deps.len() - 5));
@@ -131,7 +130,7 @@ fn summarize_package_json_str(path: &Path) -> Result<String> {
 
     if let Some(name) = json.get("name").and_then(|v| v.as_str()) {
         let version = json.get("version").and_then(|v| v.as_str()).unwrap_or("?");
-        out.push_str(&format!("  {} @ {}\n", name, version));
+        out.push_str(&format!("  {name} @ {version}\n"));
     }
     if let Some(deps) = json.get("dependencies").and_then(|v| v.as_object()) {
         out.push_str(&format!("  Dependencies ({}):\n", deps.len()));
@@ -154,7 +153,7 @@ fn summarize_package_json_str(path: &Path) -> Result<String> {
                 out.push_str(&format!("    ... +{} more\n", dev_deps.len() - 5));
                 break;
             }
-            out.push_str(&format!("    {}\n", name));
+            out.push_str(&format!("    {name}\n"));
         }
     }
     Ok(out)
@@ -172,15 +171,15 @@ fn summarize_requirements_str(path: &Path) -> Result<String> {
             continue;
         }
         if let Some(caps) = dep_re.captures(line) {
-            let name = caps.get(1).map(|m| m.as_str()).unwrap_or("");
-            let version = caps.get(2).map(|m| m.as_str()).unwrap_or("");
-            deps.push(format!("{}{}", name, version));
+            let name = caps.get(1).map_or("", |m| m.as_str());
+            let version = caps.get(2).map_or("", |m| m.as_str());
+            deps.push(format!("{name}{version}"));
         }
     }
 
     out.push_str(&format!("  Packages ({}):\n", deps.len()));
     for d in deps.iter().take(15) {
-        out.push_str(&format!("    {}\n", d));
+        out.push_str(&format!("    {d}\n"));
     }
     if deps.len() > 15 {
         out.push_str(&format!("    ... +{} more\n", deps.len() - 15));
@@ -195,7 +194,7 @@ fn summarize_pyproject_str(path: &Path) -> Result<String> {
     let mut out = String::new();
 
     for line in content.lines() {
-        if line.contains("dependencies") && line.contains("[") {
+        if line.contains("dependencies") && line.contains('[') {
             in_deps = true;
             continue;
         }
@@ -215,7 +214,7 @@ fn summarize_pyproject_str(path: &Path) -> Result<String> {
     if !deps.is_empty() {
         out.push_str(&format!("  Dependencies ({}):\n", deps.len()));
         for d in deps.iter().take(10) {
-            out.push_str(&format!("    {}\n", d));
+            out.push_str(&format!("    {d}\n"));
         }
         if deps.len() > 10 {
             out.push_str(&format!("    ... +{} more\n", deps.len() - 10));
@@ -247,18 +246,18 @@ fn summarize_gomod_str(path: &Path) -> Result<String> {
             if parts.len() >= 2 {
                 deps.push(format!("{} {}", parts[0], parts[1]));
             }
-        } else if line.starts_with("require ") && !line.contains("(") {
+        } else if line.starts_with("require ") && !line.contains('(') {
             deps.push(line.trim_start_matches("require ").to_string());
         }
     }
 
     if !module_name.is_empty() {
-        out.push_str(&format!("  {} (go {})\n", module_name, go_version));
+        out.push_str(&format!("  {module_name} (go {go_version})\n"));
     }
     if !deps.is_empty() {
         out.push_str(&format!("  Dependencies ({}):\n", deps.len()));
         for d in deps.iter().take(10) {
-            out.push_str(&format!("    {}\n", d));
+            out.push_str(&format!("    {d}\n"));
         }
         if deps.len() > 10 {
             out.push_str(&format!("    ... +{} more\n", deps.len() - 10));

@@ -64,7 +64,7 @@ fn parse_trx_time_bounds(content: &str) -> Option<(DateTime<FixedOffset>, DateTi
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+            Ok(Event::Start(e) | Event::Empty(e)) => {
                 if local_name(e.name().as_ref()) != b"Times" {
                     buf.clear();
                     continue;
@@ -185,7 +185,7 @@ fn find_recent_trx_in_dir(dir: &Path) -> Option<PathBuf> {
 
     std::fs::read_dir(dir)
         .ok()?
-        .filter_map(|entry| entry.ok())
+        .filter_map(std::result::Result::ok)
         .filter_map(|entry| {
             let path = entry.path();
             let is_trx = path

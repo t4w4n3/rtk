@@ -66,7 +66,7 @@ pub struct Dependency {
     pub current_version: String,
     pub latest_version: Option<String>,
     pub wanted_version: Option<String>,
-    pub dev_dependency: bool,
+    pub is_dev: bool,
 }
 
 /// Build output (next, webpack, vite, cargo, etc.)

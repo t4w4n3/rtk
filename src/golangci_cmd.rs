@@ -44,10 +44,10 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         .iter()
         .any(|a| a == "--out-format" || a.starts_with("--out-format="));
 
-    if !has_format {
-        cmd.arg("run").arg("--out-format=json");
-    } else {
+    if has_format {
         cmd.arg("run");
+    } else {
+        cmd.arg("run").arg("--out-format=json");
     }
 
     for arg in args {
@@ -64,11 +64,11 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let raw = format!("{}\n{}", stdout, stderr);
+    let raw = format!("{stdout}\n{stderr}");
 
     let filtered = filter_golangci_json(&stdout);
 
-    println!("{}", filtered);
+    println!("{filtered}");
 
     // Include stderr if present (config errors, etc.)
     if !stderr.trim().is_empty() && verbose > 0 {
@@ -85,7 +85,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     // golangci-lint: exit 0 = clean, exit 1 = lint issues, exit 2+ = config/build error
     // None = killed by signal (OOM, SIGKILL) — always fatal
     match output.status.code() {
-        Some(0) | Some(1) => Ok(()),
+        Some(0 | 1) => Ok(()),
         Some(code) => {
             if !stderr.trim().is_empty() {
                 eprintln!("{}", stderr.trim());
@@ -146,8 +146,7 @@ fn filter_golangci_json(output: &str) -> String {
     // Build output
     let mut result = String::new();
     result.push_str(&format!(
-        "golangci-lint: {} issues in {} files\n",
-        total_issues, total_files
+        "golangci-lint: {total_issues} issues in {total_files} files\n"
     ));
     result.push_str("═══════════════════════════════════════\n");
 
@@ -158,7 +157,7 @@ fn filter_golangci_json(output: &str) -> String {
     if !linter_counts.is_empty() {
         result.push_str("Top linters:\n");
         for (linter, count) in linter_counts.iter().take(10) {
-            result.push_str(&format!("  {} ({}x)\n", linter, count));
+            result.push_str(&format!("  {linter} ({count}x)\n"));
         }
         result.push('\n');
     }
@@ -167,7 +166,7 @@ fn filter_golangci_json(output: &str) -> String {
     result.push_str("Top files:\n");
     for (file, count) in file_counts.iter().take(10) {
         let short_path = compact_path(file);
-        result.push_str(&format!("  {} ({} issues)\n", short_path, count));
+        result.push_str(&format!("  {short_path} ({count} issues)\n"));
 
         // Show top 3 linters in this file
         let mut file_linters: HashMap<String, usize> = HashMap::new();
@@ -179,7 +178,7 @@ fn filter_golangci_json(output: &str) -> String {
         file_linter_counts.sort_by(|a, b| b.1.cmp(a.1));
 
         for (linter, count) in file_linter_counts.iter().take(3) {
-            result.push_str(&format!("    {} ({})\n", linter, count));
+            result.push_str(&format!("    {linter} ({count})\n"));
         }
     }
 

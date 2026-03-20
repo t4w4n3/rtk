@@ -189,7 +189,7 @@ fn print_rewrite(cmd: &str) {
             }
         }
     });
-    println!("{}", output);
+    println!("{output}");
 }
 
 #[cfg(test)]

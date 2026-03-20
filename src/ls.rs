@@ -41,12 +41,12 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     let flags: Vec<&str> = args
         .iter()
         .filter(|a| a.starts_with('-'))
-        .map(|s| s.as_str())
+        .map(std::string::String::as_str)
         .collect();
     let paths: Vec<&str> = args
         .iter()
         .filter(|a| !a.starts_with('-'))
-        .map(|s| s.as_str())
+        .map(std::string::String::as_str)
         .collect();
 
     // Build ls -la + any extra flags the user passed (e.g. -R)
@@ -66,7 +66,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
                 .filter(|c| *c != 'l' && *c != 'a' && *c != 'h')
                 .collect();
             if !extra.is_empty() {
-                cmd.arg(format!("-{}", extra));
+                cmd.arg(format!("-{extra}"));
             }
         }
     }
@@ -84,7 +84,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        eprint!("{}", stderr);
+        eprint!("{stderr}");
         std::process::exit(output.status.code().unwrap_or(1));
     }
 
@@ -96,10 +96,10 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
             "Chars: {} → {} ({}% reduction)",
             raw.len(),
             filtered.len(),
-            if !raw.is_empty() {
-                100 - (filtered.len() * 100 / raw.len())
-            } else {
+            if raw.is_empty() {
                 0
+            } else {
+                100 - (filtered.len() * 100 / raw.len())
             }
         );
     }
@@ -109,9 +109,9 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     } else {
         paths.join(" ")
     };
-    print!("{}", filtered);
+    print!("{filtered}");
     timer.track(
-        &format!("ls -la {}", target_display),
+        &format!("ls -la {target_display}"),
         "rtk ls",
         &raw,
         &filtered,
@@ -127,7 +127,7 @@ fn human_size(bytes: u64) -> String {
     } else if bytes >= 1024 {
         format!("{:.1}K", bytes as f64 / 1024.0)
     } else {
-        format!("{}B", bytes)
+        format!("{bytes}B")
     }
 }
 
@@ -210,7 +210,7 @@ fn compact_ls(raw: &str, show_all: bool) -> String {
         let ext_parts: Vec<String> = ext_counts
             .iter()
             .take(5)
-            .map(|(ext, count)| format!("{} {}", count, ext))
+            .map(|(ext, count)| format!("{count} {ext}"))
             .collect();
         summary.push_str(" (");
         summary.push_str(&ext_parts.join(", "));

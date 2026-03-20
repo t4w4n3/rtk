@@ -39,6 +39,7 @@ struct RubocopLocation {
 }
 
 #[derive(Deserialize)]
+#[allow(clippy::struct_field_names)]
 struct RubocopSummary {
     offense_count: usize,
     #[allow(dead_code)]
@@ -81,7 +82,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let raw = format!("{}\n{}", stdout, stderr);
+    let raw = format!("{stdout}\n{stderr}");
 
     let exit_code = exit_code_from_output(&output, "rubocop");
 
@@ -94,9 +95,9 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     };
 
     if let Some(hint) = crate::tee::tee_and_hint(&raw, "rubocop", exit_code) {
-        println!("{}\n{}", filtered, hint);
+        println!("{filtered}\n{hint}");
     } else {
-        println!("{}", filtered);
+        println!("{filtered}");
     }
 
     if !stderr.trim().is_empty() && (!output.status.success() || verbose > 0) {
@@ -138,7 +139,7 @@ fn filter_rubocop_json(output: &str) -> String {
     let rubocop = match parsed {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("[rtk] rubocop: JSON parse failed ({})", e);
+            eprintln!("[rtk] rubocop: JSON parse failed ({e})");
             return crate::utils::fallback_tail(output, "rubocop (JSON parse error)", 5);
         }
     };
@@ -196,7 +197,7 @@ fn filter_rubocop_json(output: &str) -> String {
 
     for file in files_with_offenses.iter().take(max_files) {
         let short = compact_ruby_path(&file.path);
-        result.push_str(&format!("\n{}\n", short));
+        result.push_str(&format!("\n{short}\n"));
 
         // Sort offenses within file: by severity rank, then by line number
         let mut sorted_offenses: Vec<&RubocopOffense> = file.offenses.iter().collect();
@@ -230,8 +231,7 @@ fn filter_rubocop_json(output: &str) -> String {
 
     if correctable_count > 0 {
         result.push_str(&format!(
-            "\n({} correctable, run `rubocop -A`)",
-            correctable_count
+            "\n({correctable_count} correctable, run `rubocop -A`)"
         ));
     }
 
@@ -260,7 +260,7 @@ fn filter_rubocop_text(output: &str) -> String {
                     total_lines - 20
                 );
             }
-            return format!("RuboCop error:\n{}", truncated);
+            return format!("RuboCop error:\n{truncated}");
         }
     }
 
@@ -272,22 +272,19 @@ fn filter_rubocop_text(output: &str) -> String {
             let files = extract_leading_number(t);
             let corrected = extract_autocorrect_count(t);
             if files > 0 && corrected > 0 {
-                return format!(
-                    "ok ✓ rubocop -A ({} files, {} autocorrected)",
-                    files, corrected
-                );
+                return format!("ok ✓ rubocop -A ({files} files, {corrected} autocorrected)");
             }
-            return format!("RuboCop: {}", t);
+            return format!("RuboCop: {t}");
         }
         if t.contains("inspected") && (t.contains("offense") || t.contains("no offenses")) {
             if t.contains("no offenses") {
                 let files = extract_leading_number(t);
                 if files > 0 {
-                    return format!("ok ✓ rubocop ({} files)", files);
+                    return format!("ok ✓ rubocop ({files} files)");
                 }
                 return "ok ✓ rubocop (no offenses)".to_string();
             }
-            return format!("RuboCop: {}", t);
+            return format!("RuboCop: {t}");
         }
     }
     // Last resort: last 5 lines
@@ -486,20 +483,20 @@ mod tests {
 
     #[test]
     fn test_filter_rubocop_text_fallback() {
-        let text = r#"Inspecting 10 files
+        let text = r"Inspecting 10 files
 ..........
 
-10 files inspected, no offenses detected"#;
+10 files inspected, no offenses detected";
         let result = filter_rubocop_text(text);
         assert_eq!(result, "ok ✓ rubocop (10 files)");
     }
 
     #[test]
     fn test_filter_rubocop_text_autocorrect() {
-        let text = r#"Inspecting 15 files
+        let text = r"Inspecting 15 files
 ...C..CC.......
 
-15 files inspected, 3 offenses detected, 3 offenses autocorrected"#;
+15 files inspected, 3 offenses detected, 3 offenses autocorrected";
         let result = filter_rubocop_text(text);
         assert_eq!(result, "ok ✓ rubocop -A (15 files, 3 autocorrected)");
     }
@@ -570,8 +567,7 @@ mod tests {
         let result = filter_rubocop_text(text);
         assert!(
             result.starts_with("RuboCop error:"),
-            "should detect Bundler error: {}",
-            result
+            "should detect Bundler error: {result}"
         );
         assert!(result.contains("GemNotFound"));
     }
@@ -583,17 +579,16 @@ mod tests {
         let result = filter_rubocop_text(text);
         assert!(
             result.starts_with("RuboCop error:"),
-            "should detect load error: {}",
-            result
+            "should detect load error: {result}"
         );
     }
 
     #[test]
     fn test_filter_rubocop_text_with_offenses() {
-        let text = r#"Inspecting 5 files
+        let text = r"Inspecting 5 files
 ..C..
 
-5 files inspected, 1 offense detected"#;
+5 files inspected, 1 offense detected";
         let result = filter_rubocop_text(text);
         assert_eq!(result, "RuboCop: 5 files inspected, 1 offense detected");
     }
@@ -616,10 +611,7 @@ mod tests {
 
         assert!(
             savings >= 60.0,
-            "RuboCop: expected ≥60% savings, got {:.1}% (in={}, out={})",
-            savings,
-            input_tokens,
-            output_tokens
+            "RuboCop: expected ≥60% savings, got {savings:.1}% (in={input_tokens}, out={output_tokens})"
         );
     }
 
@@ -641,8 +633,7 @@ mod tests {
         let mut files_json = Vec::new();
         for i in 1..=12 {
             files_json.push(format!(
-                r#"{{"path": "app/models/model_{}.rb", "offenses": [{{"severity": "convention", "message": "msg{}", "cop_name": "Cop/X{}", "correctable": false, "location": {{"start_line": 1, "start_column": 1}}}}]}}"#,
-                i, i, i
+                r#"{{"path": "app/models/model_{i}.rb", "offenses": [{{"severity": "convention", "message": "msg{i}", "cop_name": "Cop/X{i}", "correctable": false, "location": {{"start_line": 1, "start_column": 1}}}}]}}"#
             ));
         }
         let json = format!(
@@ -652,8 +643,7 @@ mod tests {
         let result = filter_rubocop_json(&json);
         assert!(
             result.contains("+2 more files"),
-            "should show +2 more files overflow: {}",
-            result
+            "should show +2 more files overflow: {result}"
         );
     }
 }

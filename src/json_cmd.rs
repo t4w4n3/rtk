@@ -27,7 +27,7 @@ fn validate_json_extension(file: &Path) -> Result<()> {
             if ext == "toml" && file.file_name().is_some_and(|n| n == "Cargo.toml") {
                 msg.push_str(" Tip: use `rtk deps` for Cargo.toml.");
             }
-            bail!("{}", msg);
+            bail!("{msg}");
         }
     }
     Ok(())
@@ -50,7 +50,7 @@ pub fn run(file: &Path, max_depth: usize, schema_only: bool, verbose: u8) -> Res
     } else {
         filter_json_compact(&content, max_depth)?
     };
-    println!("{}", output);
+    println!("{output}");
     timer.track(
         &format!("cat {}", file.display()),
         "rtk json",
@@ -79,7 +79,7 @@ pub fn run_stdin(max_depth: usize, schema_only: bool, verbose: u8) -> Result<()>
     } else {
         filter_json_compact(&content, max_depth)?
     };
-    println!("{}", output);
+    println!("{output}");
     timer.track("cat - (stdin)", "rtk json -", &content, &output);
     Ok(())
 }
@@ -95,23 +95,23 @@ fn compact_json(value: &Value, depth: usize, max_depth: usize) -> String {
     let indent = "  ".repeat(depth);
 
     if depth > max_depth {
-        return format!("{}...", indent);
+        return format!("{indent}...");
     }
 
     match value {
-        Value::Null => format!("{}null", indent),
-        Value::Bool(b) => format!("{}{}", indent, b),
-        Value::Number(n) => format!("{}{}", indent, n),
+        Value::Null => format!("{indent}null"),
+        Value::Bool(b) => format!("{indent}{b}"),
+        Value::Number(n) => format!("{indent}{n}"),
         Value::String(s) => {
             if s.len() > 80 {
                 format!("{}\"{}...\"", indent, &s[..77])
             } else {
-                format!("{}\"{}\"", indent, s)
+                format!("{indent}\"{s}\"")
             }
         }
         Value::Array(arr) => {
             if arr.is_empty() {
-                format!("{}[]", indent)
+                format!("{indent}[]")
             } else if arr.len() > 5 {
                 let first = compact_json(&arr[0], depth + 1, max_depth);
                 format!("{}[{}, ... +{} more]", indent, first.trim(), arr.len() - 1)
@@ -132,16 +132,16 @@ fn compact_json(value: &Value, depth: usize, max_depth: usize) -> String {
                 } else {
                     let mut lines = vec![format!("{}[", indent)];
                     for item in &items {
-                        lines.push(format!("{},", item));
+                        lines.push(format!("{item},"));
                     }
-                    lines.push(format!("{}]", indent));
+                    lines.push(format!("{indent}]"));
                     lines.join("\n")
                 }
             }
         }
         Value::Object(map) => {
             if map.is_empty() {
-                format!("{}{{}}", indent)
+                format!("{indent}{{}}")
             } else {
                 let mut lines = vec![format!("{}{{", indent)];
                 let mut keys: Vec<_> = map.keys().collect();
@@ -158,7 +158,7 @@ fn compact_json(value: &Value, depth: usize, max_depth: usize) -> String {
                         let val_str = compact_json(val, 0, max_depth);
                         lines.push(format!("{}  {}: {}", indent, key, val_str.trim()));
                     } else {
-                        lines.push(format!("{}  {}:", indent, key));
+                        lines.push(format!("{indent}  {key}:"));
                         lines.push(compact_json(val, depth + 1, max_depth));
                     }
 
@@ -167,7 +167,7 @@ fn compact_json(value: &Value, depth: usize, max_depth: usize) -> String {
                         break;
                     }
                 }
-                lines.push(format!("{}}}", indent));
+                lines.push(format!("{indent}}}"));
                 lines.join("\n")
             }
         }
@@ -185,43 +185,43 @@ fn extract_schema(value: &Value, depth: usize, max_depth: usize) -> String {
     let indent = "  ".repeat(depth);
 
     if depth > max_depth {
-        return format!("{}...", indent);
+        return format!("{indent}...");
     }
 
     match value {
-        Value::Null => format!("{}null", indent),
-        Value::Bool(_) => format!("{}bool", indent),
+        Value::Null => format!("{indent}null"),
+        Value::Bool(_) => format!("{indent}bool"),
         Value::Number(n) => {
             if n.is_i64() {
-                format!("{}int", indent)
+                format!("{indent}int")
             } else {
-                format!("{}float", indent)
+                format!("{indent}float")
             }
         }
         Value::String(s) => {
             if s.len() > 50 {
                 format!("{}string[{}]", indent, s.len())
             } else if s.is_empty() {
-                format!("{}string", indent)
+                format!("{indent}string")
             } else {
                 // Check if it looks like a URL, date, etc.
                 if s.starts_with("http") {
-                    format!("{}url", indent)
+                    format!("{indent}url")
                 } else if s.contains('-') && s.len() == 10 {
-                    format!("{}date?", indent)
+                    format!("{indent}date?")
                 } else {
-                    format!("{}string", indent)
+                    format!("{indent}string")
                 }
             }
         }
         Value::Array(arr) => {
             if arr.is_empty() {
-                format!("{}[]", indent)
+                format!("{indent}[]")
             } else {
                 let first_schema = extract_schema(&arr[0], depth + 1, max_depth);
                 let trimmed = first_schema.trim();
                 if arr.len() == 1 {
-                    format!("{}[\n{}\n{}]", indent, first_schema, indent)
+                    format!("{indent}[\n{first_schema}\n{indent}]")
                 } else {
                     format!("{}[{}] ({})", indent, trimmed, arr.len())
                 }
@@ -229,7 +229,7 @@ fn extract_schema(value: &Value, depth: usize, max_depth: usize) -> String {
         }
         Value::Object(map) => {
             if map.is_empty() {
-                format!("{}{{}}", indent)
+                format!("{indent}{{}}")
             } else {
                 let mut lines = vec![format!("{}{{", indent)];
                 let mut keys: Vec<_> = map.keys().collect();
@@ -248,12 +248,12 @@ fn extract_schema(value: &Value, depth: usize, max_depth: usize) -> String {
 
                     if is_simple {
                         if i < keys.len() - 1 {
-                            lines.push(format!("{}  {}: {},", indent, key, val_trimmed));
+                            lines.push(format!("{indent}  {key}: {val_trimmed},"));
                         } else {
-                            lines.push(format!("{}  {}: {}", indent, key, val_trimmed));
+                            lines.push(format!("{indent}  {key}: {val_trimmed}"));
                         }
                     } else {
-                        lines.push(format!("{}  {}:", indent, key));
+                        lines.push(format!("{indent}  {key}:"));
                         lines.push(val_schema);
                     }
 
@@ -263,7 +263,7 @@ fn extract_schema(value: &Value, depth: usize, max_depth: usize) -> String {
                         break;
                     }
                 }
-                lines.push(format!("{}}}", indent));
+                lines.push(format!("{indent}}}"));
                 lines.join("\n")
             }
         }

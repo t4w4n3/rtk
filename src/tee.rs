@@ -53,7 +53,7 @@ fn cleanup_old_files(dir: &std::path::Path, max_files: usize) {
         .ok()
         .into_iter()
         .flatten()
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "log"))
         .collect();
 
@@ -62,7 +62,7 @@ fn cleanup_old_files(dir: &std::path::Path, max_files: usize) {
     }
 
     // Sort by filename (which starts with epoch timestamp = chronological)
-    entries.sort_by_key(|e| e.file_name());
+    entries.sort_by_key(std::fs::DirEntry::file_name);
 
     let to_remove = entries.len() - max_files;
     for entry in entries.iter().take(to_remove) {
@@ -115,7 +115,7 @@ fn write_tee_file(
         .duration_since(std::time::UNIX_EPOCH)
         .ok()?
         .as_secs();
-    let filename = format!("{}_{}.log", epoch, slug);
+    let filename = format!("{epoch}_{slug}.log");
     let filepath = tee_dir.join(filename);
 
     // Truncate at max_file_size
@@ -171,7 +171,7 @@ fn format_hint(path: &std::path::Path) -> String {
         path.display().to_string()
     };
 
-    format!("[full output: {}]", display)
+    format!("[full output: {display}]")
 }
 
 /// Convenience: tee + format hint in one call.
@@ -182,7 +182,7 @@ pub fn tee_and_hint(raw: &str, command_slug: &str, exit_code: i32) -> Option<Str
 }
 
 /// TeeMode controls when tee writes files.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum TeeMode {
     #[default]
@@ -322,23 +322,26 @@ mod tests {
 
         // Create 25 .log files
         for i in 0..25 {
-            let filename = format!("{:010}_{}.log", 1000000 + i, "test");
+            let filename = format!("{:010}_{}.log", 1_000_000 + i, "test");
             fs::write(dir.join(&filename), "content").unwrap();
         }
 
         cleanup_old_files(dir, 20);
 
-        let remaining: Vec<_> = fs::read_dir(dir).unwrap().filter_map(|e| e.ok()).collect();
+        let remaining: Vec<_> = fs::read_dir(dir)
+            .unwrap()
+            .filter_map(std::result::Result::ok)
+            .collect();
         assert_eq!(remaining.len(), 20);
 
         // Oldest 5 should be removed
         for i in 0..5 {
-            let filename = format!("{:010}_{}.log", 1000000 + i, "test");
+            let filename = format!("{:010}_{}.log", 1_000_000 + i, "test");
             assert!(!dir.join(&filename).exists());
         }
         // Newest 20 should remain
         for i in 5..25 {
-            let filename = format!("{:010}_{}.log", 1000000 + i, "test");
+            let filename = format!("{:010}_{}.log", 1_000_000 + i, "test");
             assert!(dir.join(&filename).exists());
         }
     }
@@ -375,7 +378,7 @@ directory = "/tmp/rtk-tee"
         assert!(config.enabled);
         assert_eq!(config.mode, TeeMode::Always);
         assert_eq!(config.max_files, 10);
-        assert_eq!(config.max_file_size, 524288);
+        assert_eq!(config.max_file_size, 524_288);
         assert_eq!(config.directory, Some(PathBuf::from("/tmp/rtk-tee")));
 
         // Round-trip

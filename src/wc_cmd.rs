@@ -32,7 +32,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         } else {
             stderr.trim().to_string()
         };
-        eprintln!("FAILED: wc {}", msg);
+        eprintln!("FAILED: wc {msg}");
         std::process::exit(output.status.code().unwrap_or(1));
     }
 
@@ -41,7 +41,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     // Detect which columns the user requested
     let mode = detect_mode(args);
     let filtered = filter_wc_output(&raw, &mode);
-    println!("{}", filtered);
+    println!("{filtered}");
 
     timer.track(
         &format!("wc {}", args.join(" ")),
@@ -74,7 +74,7 @@ fn detect_mode(args: &[String]) -> WcMode {
     let flags: Vec<&str> = args
         .iter()
         .filter(|a| a.starts_with('-'))
-        .map(|s| s.as_str())
+        .map(std::string::String::as_str)
         .collect();
 
     if flags.is_empty() {
@@ -155,7 +155,10 @@ fn format_single_line(line: &str, mode: &WcMode) -> String {
     match mode {
         WcMode::Lines | WcMode::Words | WcMode::Bytes | WcMode::Chars => {
             // First number is the only requested column
-            parts.first().map(|s| s.to_string()).unwrap_or_default()
+            parts
+                .first()
+                .map(std::string::ToString::to_string)
+                .unwrap_or_default()
         }
         WcMode::Full => {
             if parts.len() >= 3 {

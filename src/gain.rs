@@ -192,7 +192,7 @@ pub fn run(
             for (idx, (cmd, count, saved, pct, avg_time)) in summary.by_command.iter().enumerate() {
                 let row_idx = format!("{:>2}.", idx + 1);
                 let cmd_cell = style_command_cell(&truncate_for_column(cmd, cmd_width)); // added: colored command
-                let count_cell = format!("{:>count_width$}", count, count_width = count_width);
+                let count_cell = format!("{count:>count_width$}");
                 let saved_cell = format!(
                     "{:>saved_width$}",
                     format_tokens(*saved),
@@ -207,8 +207,7 @@ pub fn run(
                 );
                 let impact = mini_bar(*saved, max_saved, impact_width); // added: impact bar
                 println!(
-                    "{}  {}  {}  {}  {}  {}  {}",
-                    row_idx, cmd_cell, count_cell, saved_cell, pct_cell, time_cell, impact
+                    "{row_idx}  {cmd_cell}  {count_cell}  {saved_cell}  {pct_cell}  {time_cell}  {impact}"
                 );
             }
             println!("{}", "─".repeat(table_width));
@@ -259,7 +258,6 @@ pub fn run(
             const ESTIMATED_PRO_MONTHLY: usize = 6_000_000;
 
             let (quota_tokens, tier_name) = match tier {
-                "pro" => (ESTIMATED_PRO_MONTHLY, "Pro ($20/mo)"),
                 "5x" => (ESTIMATED_PRO_MONTHLY * 5, "Max 5x ($100/mo)"),
                 "20x" => (ESTIMATED_PRO_MONTHLY * 20, "Max 20x ($200/mo)"),
                 _ => (ESTIMATED_PRO_MONTHLY, "Pro ($20/mo)"),
@@ -275,7 +273,7 @@ pub fn run(
                 "Tokens saved (lifetime)",
                 format_tokens(summary.total_saved),
             );
-            print_kpi("Quota preserved", format!("{:.1}%", quota_pct));
+            print_kpi("Quota preserved", format!("{quota_pct:.1}%"));
             println!();
             println!("Note: Heuristic estimate based on ~44K tokens/5h (Pro baseline)");
             println!("      Actual limits use rolling 5-hour windows, not monthly caps.");
@@ -340,7 +338,7 @@ fn truncate_for_column(text: &str, width: usize) -> String {
     }
     let char_count = text.chars().count();
     if char_count <= width {
-        return format!("{:<width$}", text, width = width);
+        return format!("{text:<width$}");
     }
     if width <= 3 {
         return text.chars().take(width).collect();
@@ -390,7 +388,7 @@ fn print_efficiency_meter(pct: f64) {
         };
         println!("Efficiency meter: {} {}", meter.green(), colored_pct);
     } else {
-        println!("Efficiency meter: {} {:.1}%", meter, pct);
+        println!("Efficiency meter: {meter} {pct:.1}%");
     }
 }
 
@@ -540,7 +538,7 @@ fn export_json(
     };
 
     let json = serde_json::to_string_pretty(&export)?;
-    println!("{}", json);
+    println!("{json}");
 
     Ok(())
 }
@@ -659,8 +657,7 @@ fn check_rtk_disabled_bypass() -> Option<String> {
     let pct = (bypassed as f64 / total_bash as f64) * 100.0;
     if pct > 10.0 {
         Some(format!(
-            "[warn] {} commands ({:.0}%) used RTK_DISABLED=1 unnecessarily — run `rtk discover` for details",
-            bypassed, pct
+            "[warn] {bypassed} commands ({pct:.0}%) used RTK_DISABLED=1 unnecessarily — run `rtk discover` for details"
         ))
     } else {
         None
@@ -695,7 +692,7 @@ fn show_failures(tracker: &Tracker) -> Result<()> {
             } else {
                 cmd.clone()
             };
-            println!("  {:>4}x  {}", count, cmd_display);
+            println!("  {count:>4}x  {cmd_display}");
         }
         println!();
     }
@@ -715,7 +712,7 @@ fn show_failures(tracker: &Tracker) -> Result<()> {
             } else {
                 rec.raw_command.clone()
             };
-            println!("  {} [{}] {}", ts_short, status, cmd_display);
+            println!("  {ts_short} [{status}] {cmd_display}");
         }
         println!();
     }

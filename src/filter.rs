@@ -17,7 +17,7 @@ impl FromStr for FilterLevel {
             "none" => Ok(FilterLevel::None),
             "minimal" => Ok(FilterLevel::Minimal),
             "aggressive" => Ok(FilterLevel::Aggressive),
-            _ => Err(format!("Unknown filter level: {}", s)),
+            _ => Err(format!("Unknown filter level: {s}")),
         }
     }
 }

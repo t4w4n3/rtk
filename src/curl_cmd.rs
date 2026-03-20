@@ -26,7 +26,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         } else {
             stderr.trim().to_string()
         };
-        eprintln!("FAILED: curl {}", msg);
+        eprintln!("FAILED: curl {msg}");
         std::process::exit(output.status.code().unwrap_or(1));
     }
 
@@ -34,7 +34,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     // Auto-detect JSON and pipe through filter
     let filtered = filter_curl_output(&stdout);
-    println!("{}", filtered);
+    println!("{filtered}");
 
     timer.track(
         &format!("curl {}", args.join(" ")),
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn test_filter_curl_long_output() {
-        let lines: Vec<String> = (0..50).map(|i| format!("Line {}", i)).collect();
+        let lines: Vec<String> = (0..50).map(|i| format!("Line {i}")).collect();
         let output = lines.join("\n");
         let result = filter_curl_output(&output);
         assert!(result.contains("Line 0"));

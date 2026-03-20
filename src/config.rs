@@ -22,7 +22,7 @@ pub struct Config {
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct HooksConfig {
-    /// Commands to exclude from auto-rewrite (e.g. ["curl", "playwright"]).
+    /// Commands to exclude from auto-rewrite (e.g. `["curl", "playwright"]`).
     /// Survives `rtk init -g` re-runs since config.toml is user-owned.
     #[serde(default)]
     pub exclude_commands: Vec<String>,
@@ -209,11 +209,11 @@ exclude_commands = ["curl", "gh"]
 
     #[test]
     fn test_config_without_hooks_section_is_valid() {
-        let toml = r#"
+        let toml = r"
 [tracking]
 enabled = true
 history_days = 90
-"#;
+";
         let config: Config = toml::from_str(toml).expect("valid toml");
         assert!(config.hooks.exclude_commands.is_empty());
     }

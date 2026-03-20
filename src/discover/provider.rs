@@ -96,7 +96,7 @@ impl SessionProvider for ClaudeProvider {
             for walk_entry in WalkDir::new(&path)
                 .follow_links(false)
                 .into_iter()
-                .filter_map(|e| e.ok())
+                .filter_map(std::result::Result::ok)
             {
                 let file_path = walk_entry.path();
                 if file_path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
@@ -198,7 +198,7 @@ impl SessionProvider for ClaudeProvider {
                                     let output_len = content.len();
                                     let is_error = block
                                         .get("is_error")
-                                        .and_then(|e| e.as_bool())
+                                        .and_then(serde_json::Value::as_bool)
                                         .unwrap_or(false);
 
                                     // Store first ~1000 chars of content for error detection
@@ -222,8 +222,9 @@ impl SessionProvider for ClaudeProvider {
         for (tool_id, command, sequence_index) in pending_tool_uses {
             let (output_len, output_content, is_error) = tool_results
                 .get(&tool_id)
-                .map(|(len, content, err)| (Some(*len), Some(content.clone()), *err))
-                .unwrap_or((None, None, false));
+                .map_or((None, None, false), |(len, content, err)| {
+                    (Some(*len), Some(content.clone()), *err)
+                });
 
             commands.push(ExtractedCommand {
                 command,
@@ -247,7 +248,7 @@ mod tests {
     fn make_jsonl(lines: &[&str]) -> tempfile::NamedTempFile {
         let mut f = tempfile::NamedTempFile::new().unwrap();
         for line in lines {
-            writeln!(f, "{}", line).unwrap();
+            writeln!(f, "{line}").unwrap();
         }
         f.flush().unwrap();
         f

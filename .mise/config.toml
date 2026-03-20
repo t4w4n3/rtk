@@ -35,7 +35,7 @@ run = "cargo fmt --all --check"
 
 [tasks.lint]
 description = "Run Clippy on all targets"
-run = "cargo clippy --all-targets -- -D warnings"
+run = "cargo clippy --all-targets -- -D warnings -W clippy::pedantic -W clippy::nursery"
 sources = ["Cargo.toml", "src/**/*.rs"]
 
 [tasks.check]
@@ -80,7 +80,7 @@ alias = "qa"
 description = "Local quality gate: fmt (auto-fix), then lint + test in parallel"
 run = '''
 cargo fmt --all
-cargo clippy --all-targets -- -D warnings & cargo test --all & wait
+cargo clippy --all-targets -- -D warnings -W clippy::pedantic -W clippy::nursery & cargo test --all & wait
 '''
 alias = "d"
 

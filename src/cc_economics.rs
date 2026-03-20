@@ -247,12 +247,11 @@ fn merge_weekly(cc: Option<Vec<CcusagePeriod>>, rtk: Vec<WeekStats>) -> Vec<Peri
     // Merge rtk data (week_start = legacy Saturday "2026-01-18")
     // Convert Saturday to Monday for alignment
     for entry in rtk {
-        let monday_key = match convert_saturday_to_monday(&entry.week_start) {
-            Some(m) => m,
-            None => {
-                eprintln!("[warn] Invalid week_start format: {}", entry.week_start);
-                continue;
-            }
+        let monday_key = if let Some(m) = convert_saturday_to_monday(&entry.week_start) {
+            m
+        } else {
+            eprintln!("[warn] Invalid week_start format: {}", entry.week_start);
+            continue;
         };
 
         map.entry(monday_key)
@@ -370,7 +369,7 @@ fn compute_totals(periods: &[PeriodEconomics]) -> Totals {
     }
 
     if pct_count > 0 {
-        totals.rtk_avg_savings_pct = pct_sum / pct_count as f64;
+        totals.rtk_avg_savings_pct = pct_sum / f64::from(pct_count);
     }
 
     // Compute global weighted metrics
@@ -599,27 +598,20 @@ fn print_period_table(periods: &[PeriodEconomics], verbose: u8) {
         );
 
         for p in periods {
-            let spent = p.cc_cost.map(format_usd).unwrap_or_else(|| "—".to_string());
+            let spent = p.cc_cost.map_or_else(|| "—".to_string(), format_usd);
             let saved = p
                 .rtk_saved_tokens
-                .map(format_tokens)
-                .unwrap_or_else(|| "—".to_string());
+                .map_or_else(|| "—".to_string(), format_tokens);
             let weighted = p
                 .savings_weighted
-                .map(format_usd)
-                .unwrap_or_else(|| "—".to_string());
-            let active = p
-                .savings_active
-                .map(format_usd)
-                .unwrap_or_else(|| "—".to_string());
+                .map_or_else(|| "—".to_string(), format_usd);
+            let active = p.savings_active.map_or_else(|| "—".to_string(), format_usd);
             let blended = p
                 .savings_blended
-                .map(format_usd)
-                .unwrap_or_else(|| "—".to_string());
+                .map_or_else(|| "—".to_string(), format_usd);
             let cmds = p
                 .rtk_commands
-                .map(|c| c.to_string())
-                .unwrap_or_else(|| "—".to_string());
+                .map_or_else(|| "—".to_string(), |c| c.to_string());
 
             println!(
                 "{:<12} {:>10} {:>10} {:>10} {:>10} {:>12} {:>12}",
@@ -638,19 +630,16 @@ fn print_period_table(periods: &[PeriodEconomics], verbose: u8) {
         );
 
         for p in periods {
-            let spent = p.cc_cost.map(format_usd).unwrap_or_else(|| "—".to_string());
+            let spent = p.cc_cost.map_or_else(|| "—".to_string(), format_usd);
             let saved = p
                 .rtk_saved_tokens
-                .map(format_tokens)
-                .unwrap_or_else(|| "—".to_string());
+                .map_or_else(|| "—".to_string(), format_tokens);
             let weighted = p
                 .savings_weighted
-                .map(format_usd)
-                .unwrap_or_else(|| "—".to_string());
+                .map_or_else(|| "—".to_string(), format_usd);
             let cmds = p
                 .rtk_commands
-                .map(|c| c.to_string())
-                .unwrap_or_else(|| "—".to_string());
+                .map_or_else(|| "—".to_string(), |c| c.to_string());
 
             println!(
                 "{:<12} {:>10} {:>10} {:>10} {:>12}",
@@ -772,7 +761,7 @@ fn export_csv(
 }
 
 fn print_csv_row(p: &PeriodEconomics) {
-    let spent = p.cc_cost.map(|c| format!("{:.4}", c)).unwrap_or_default();
+    let spent = p.cc_cost.map(|c| format!("{c:.4}")).unwrap_or_default();
     let input_tokens = p.cc_input_tokens.map(|t| t.to_string()).unwrap_or_default();
     let output_tokens = p
         .cc_output_tokens
@@ -797,15 +786,15 @@ fn print_csv_row(p: &PeriodEconomics) {
         .unwrap_or_default();
     let weighted_savings = p
         .savings_weighted
-        .map(|s| format!("{:.4}", s))
+        .map(|s| format!("{s:.4}"))
         .unwrap_or_default();
     let active_savings = p
         .savings_active
-        .map(|s| format!("{:.4}", s))
+        .map(|s| format!("{s:.4}"))
         .unwrap_or_default();
     let blended_savings = p
         .savings_blended
-        .map(|s| format!("{:.4}", s))
+        .map(|s| format!("{s:.4}"))
         .unwrap_or_default();
     let cmds = p.rtk_commands.map(|c| c.to_string()).unwrap_or_default();
 

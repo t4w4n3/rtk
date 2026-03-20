@@ -7,7 +7,7 @@ pub fn run(url: &str, args: &[String], verbose: u8) -> Result<()> {
     let timer = tracking::TimedExecution::start();
 
     if verbose > 0 {
-        eprintln!("wget: {}", url);
+        eprintln!("wget: {url}");
     }
 
     // Run wget normally but capture output to parse it
@@ -27,7 +27,7 @@ pub fn run(url: &str, args: &[String], verbose: u8) -> Result<()> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    let raw_output = format!("{}\n{}", stderr, stdout);
+    let raw_output = format!("{stderr}\n{stdout}");
 
     if output.status.success() {
         let filename = extract_filename_from_output(&stderr, url, args);
@@ -38,13 +38,13 @@ pub fn run(url: &str, args: &[String], verbose: u8) -> Result<()> {
             filename,
             format_size(size)
         );
-        println!("{}", msg);
-        timer.track(&format!("wget {}", url), "rtk wget", &raw_output, &msg);
+        println!("{msg}");
+        timer.track(&format!("wget {url}"), "rtk wget", &raw_output, &msg);
     } else {
         let error = parse_error(&stderr, &stdout);
         let msg = format!("{} FAILED: {}", compact_url(url), error);
-        println!("{}", msg);
-        timer.track(&format!("wget {}", url), "rtk wget", &raw_output, &msg);
+        println!("{msg}");
+        timer.track(&format!("wget {url}"), "rtk wget", &raw_output, &msg);
         std::process::exit(output.status.code().unwrap_or(1));
     }
 
@@ -56,7 +56,7 @@ pub fn run_stdout(url: &str, args: &[String], verbose: u8) -> Result<()> {
     let timer = tracking::TimedExecution::start();
 
     if verbose > 0 {
-        eprintln!("wget: {} -> stdout", url);
+        eprintln!("wget: {url} -> stdout");
     }
 
     let mut cmd_args = vec!["-q", "-O", "-"];
@@ -92,12 +92,12 @@ pub fn run_stdout(url: &str, args: &[String], verbose: u8) -> Result<()> {
         } else {
             rtk_output.push_str(&format!("{} ok | {} lines\n", compact_url(url), total));
             for line in &lines {
-                rtk_output.push_str(&format!("{}\n", line));
+                rtk_output.push_str(&format!("{line}\n"));
             }
         }
-        print!("{}", rtk_output);
+        print!("{rtk_output}");
         timer.track(
-            &format!("wget -O - {}", url),
+            &format!("wget -O - {url}"),
             "rtk wget -o",
             &raw_output,
             &rtk_output,
@@ -106,8 +106,8 @@ pub fn run_stdout(url: &str, args: &[String], verbose: u8) -> Result<()> {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let error = parse_error(&stderr, "");
         let msg = format!("{} FAILED: {}", compact_url(url), error);
-        println!("{}", msg);
-        timer.track(&format!("wget -O - {}", url), "rtk wget -o", &stderr, &msg);
+        println!("{msg}");
+        timer.track(&format!("wget -O - {url}"), "rtk wget -o", &stderr, &msg);
         std::process::exit(output.status.code().unwrap_or(1));
     }
 
@@ -180,7 +180,7 @@ fn format_size(bytes: u64) -> String {
         return "?".to_string();
     }
     if bytes < 1024 {
-        format!("{}B", bytes)
+        format!("{bytes}B")
     } else if bytes < 1024 * 1024 {
         format!("{:.1}KB", bytes as f64 / 1024.0)
     } else if bytes < 1024 * 1024 * 1024 {
@@ -204,14 +204,14 @@ fn compact_url(url: &str) -> String {
     } else {
         let prefix: String = chars[..25].iter().collect();
         let suffix: String = chars[chars.len() - 20..].iter().collect();
-        format!("{}...{}", prefix, suffix)
+        format!("{prefix}...{suffix}")
     }
 }
 
 #[allow(dead_code)]
 fn parse_error(stderr: &str, stdout: &str) -> String {
     // Common wget error patterns
-    let combined = format!("{}\n{}", stderr, stdout);
+    let combined = format!("{stderr}\n{stdout}");
 
     if combined.contains("404") {
         return "404 Not Found".to_string();
@@ -244,7 +244,7 @@ fn parse_error(stderr: &str, stdout: &str) -> String {
         if !trimmed.is_empty() && !trimmed.starts_with("--") {
             if trimmed.len() > 60 {
                 let t: String = trimmed.chars().take(60).collect();
-                return format!("{}...", t);
+                return format!("{t}...");
             }
             return trimmed.to_string();
         }
@@ -258,6 +258,6 @@ fn truncate_line(line: &str, max: usize) -> String {
         line.to_string()
     } else {
         let t: String = line.chars().take(max.saturating_sub(3)).collect();
-        format!("{}...", t)
+        format!("{t}...")
     }
 }

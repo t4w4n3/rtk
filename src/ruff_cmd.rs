@@ -46,18 +46,14 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     if is_check {
         // Force JSON output for check command
-        if !args.contains(&"--output-format".to_string()) {
-            cmd.arg("check").arg("--output-format=json");
-        } else {
+        if args.contains(&"--output-format".to_string()) {
             cmd.arg("check");
+        } else {
+            cmd.arg("check").arg("--output-format=json");
         }
 
         // Add user arguments (skip "check" if it was the first arg)
-        let start_idx = if !args.is_empty() && args[0] == "check" {
-            1
-        } else {
-            0
-        };
+        let start_idx = usize::from(!args.is_empty() && args[0] == "check");
         for arg in &args[start_idx..] {
             cmd.arg(arg);
         }
@@ -87,7 +83,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let raw = format!("{}\n{}", stdout, stderr);
+    let raw = format!("{stdout}\n{stderr}");
 
     let filtered = if is_check && !stdout.trim().is_empty() {
         filter_ruff_check_json(&stdout)
@@ -98,7 +94,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         raw.trim().to_string()
     };
 
-    println!("{}", filtered);
+    println!("{filtered}");
 
     timer.track(
         &format!("ruff {}", args.join(" ")),
@@ -161,12 +157,11 @@ pub fn filter_ruff_check_json(output: &str) -> String {
     // Build output
     let mut result = String::new();
     result.push_str(&format!(
-        "Ruff: {} issues in {} files",
-        total_issues, total_files
+        "Ruff: {total_issues} issues in {total_files} files"
     ));
 
     if fixable_count > 0 {
-        result.push_str(&format!(" ({} fixable)", fixable_count));
+        result.push_str(&format!(" ({fixable_count} fixable)"));
     }
     result.push('\n');
     result.push_str("═══════════════════════════════════════\n");
@@ -178,7 +173,7 @@ pub fn filter_ruff_check_json(output: &str) -> String {
     if !rule_counts.is_empty() {
         result.push_str("Top rules:\n");
         for (rule, count) in rule_counts.iter().take(10) {
-            result.push_str(&format!("  {} ({}x)\n", rule, count));
+            result.push_str(&format!("  {rule} ({count}x)\n"));
         }
         result.push('\n');
     }
@@ -187,7 +182,7 @@ pub fn filter_ruff_check_json(output: &str) -> String {
     result.push_str("Top files:\n");
     for (file, count) in file_counts.iter().take(10) {
         let short_path = compact_path(file);
-        result.push_str(&format!("  {} ({} issues)\n", short_path, count));
+        result.push_str(&format!("  {short_path} ({count} issues)\n"));
 
         // Show top 3 rules in this file
         let mut file_rules: HashMap<String, usize> = HashMap::new();
@@ -199,7 +194,7 @@ pub fn filter_ruff_check_json(output: &str) -> String {
         file_rule_counts.sort_by(|a, b| b.1.cmp(a.1));
 
         for (rule, count) in file_rule_counts.iter().take(3) {
-            result.push_str(&format!("    {} ({})\n", rule, count));
+            result.push_str(&format!("    {rule} ({count})\n"));
         }
     }
 
@@ -209,8 +204,7 @@ pub fn filter_ruff_check_json(output: &str) -> String {
 
     if fixable_count > 0 {
         result.push_str(&format!(
-            "\n[hint] Run `ruff check --fix` to auto-fix {} issues\n",
-            fixable_count
+            "\n[hint] Run `ruff check --fix` to auto-fix {fixable_count} issues\n"
         ));
     }
 
@@ -290,7 +284,7 @@ pub fn filter_ruff_format(output: &str) -> String {
             }
 
             if files_checked > 0 {
-                result.push_str(&format!("\n{} files already formatted\n", files_checked));
+                result.push_str(&format!("\n{files_checked} files already formatted\n"));
             }
 
             result.push_str("\n[hint] Run `ruff format` to format these files\n");
@@ -380,9 +374,9 @@ mod tests {
 
     #[test]
     fn test_filter_ruff_format_needs_formatting() {
-        let output = r#"Would reformat: src/main.py
+        let output = r"Would reformat: src/main.py
 Would reformat: tests/test_utils.py
-2 files would be reformatted, 3 files left unchanged"#;
+2 files would be reformatted, 3 files left unchanged";
         let result = filter_ruff_format(output);
         assert!(result.contains("2 files need formatting"));
         assert!(result.contains("main.py"));

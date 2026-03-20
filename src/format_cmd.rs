@@ -57,21 +57,16 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     let formatter = detect_formatter(args);
 
     // Determine start index for actual arguments
-    let start_idx = if !args.is_empty() && args[0] == formatter {
-        1 // Skip formatter name if it was explicitly provided
-    } else {
-        0 // Use all args if formatter was auto-detected
-    };
+    let start_idx = usize::from(!args.is_empty() && args[0] == formatter);
 
     if verbose > 0 {
-        eprintln!("Detected formatter: {}", formatter);
+        eprintln!("Detected formatter: {formatter}");
         eprintln!("Arguments: {}", args[start_idx..].join(" "));
     }
 
     // Build command based on formatter
     let mut cmd = match formatter.as_str() {
         "prettier" => package_manager_exec("prettier"),
-        "black" | "ruff" => resolved_command(formatter.as_str()),
         "biome" => package_manager_exec("biome"),
         _ => resolved_command(formatter.as_str()),
     };
@@ -110,13 +105,12 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     }
 
     let output = cmd.output().context(format!(
-        "Failed to run {}. Is it installed? Try: pip install {} (or npm/pnpm for JS formatters)",
-        formatter, formatter
+        "Failed to run {formatter}. Is it installed? Try: pip install {formatter} (or npm/pnpm for JS formatters)"
     ))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let raw = format!("{}\n{}", stdout, stderr);
+    let raw = format!("{stdout}\n{stderr}");
 
     // Dispatch to appropriate filter based on formatter
     let filtered = match formatter.as_str() {
@@ -126,7 +120,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         _ => raw.trim().to_string(),
     };
 
-    println!("{}", filtered);
+    println!("{filtered}");
 
     timer.track(
         &format!("{} {}", formatter, user_args.join(" ")),
@@ -228,20 +222,17 @@ fn filter_black_output(output: &str) -> String {
         // All files formatted correctly
         result.push_str("Format (black): All files formatted");
         if files_unchanged > 0 {
-            result.push_str(&format!(" ({} files checked)", files_unchanged));
+            result.push_str(&format!(" ({files_unchanged} files checked)"));
         }
     } else if needs_formatting {
         // Files need formatting
-        let count = if !files_to_format.is_empty() {
-            files_to_format.len()
-        } else {
+        let count = if files_to_format.is_empty() {
             files_would_reformat
+        } else {
+            files_to_format.len()
         };
 
-        result.push_str(&format!(
-            "Format (black): {} files need formatting\n",
-            count
-        ));
+        result.push_str(&format!("Format (black): {count} files need formatting\n"));
         result.push_str("═══════════════════════════════════════\n");
 
         if !files_to_format.is_empty() {
@@ -258,7 +249,7 @@ fn filter_black_output(output: &str) -> String {
         }
 
         if files_unchanged > 0 {
-            result.push_str(&format!("\n{} files already formatted\n", files_unchanged));
+            result.push_str(&format!("\n{files_unchanged} files already formatted\n"));
         }
 
         result.push_str("\n[hint] Run `black .` to format these files\n");
@@ -353,10 +344,10 @@ mod tests {
 
     #[test]
     fn test_filter_black_needs_formatting() {
-        let output = r#"would reformat: src/main.py
+        let output = r"would reformat: src/main.py
 would reformat: tests/test_utils.py
 Oh no! 💥 💔 💥
-2 files would be reformatted, 3 files would be left unchanged."#;
+2 files would be reformatted, 3 files would be left unchanged.";
 
         let result = filter_black_output(output);
         assert!(result.contains("2 files need formatting"));

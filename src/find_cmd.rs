@@ -98,13 +98,14 @@ fn parse_find_args(args: &[String]) -> Result<FindArgs> {
 /// Parse native find syntax: `find [path] -name "*.rs" -type f -maxdepth 3`
 fn parse_native_find_args(args: &[String]) -> Result<FindArgs> {
     let mut parsed = FindArgs::default();
-    let mut i = 0;
 
     // First non-flag argument is the path (standard find behavior)
-    if !args[0].starts_with('-') {
-        parsed.path = args[0].clone();
-        i = 1;
-    }
+    let mut i = if args[0].starts_with('-') {
+        0
+    } else {
+        parsed.path.clone_from(&args[0]);
+        1
+    };
 
     while i < args.len() {
         match args[i].as_str() {
@@ -130,7 +131,7 @@ fn parse_native_find_args(args: &[String]) -> Result<FindArgs> {
                 }
             }
             flag if flag.starts_with('-') => {
-                eprintln!("rtk find: unknown flag '{}', ignored", flag);
+                eprintln!("rtk find: unknown flag '{flag}', ignored");
             }
             _ => {}
         }
@@ -150,7 +151,7 @@ fn parse_rtk_find_args(args: &[String]) -> Result<FindArgs> {
 
     // Second positional arg (if not a flag) is the path
     if i < args.len() && !args[i].starts_with('-') {
-        parsed.path = args[i].clone();
+        parsed.path.clone_from(&args[i]);
         i += 1;
     }
 
@@ -203,7 +204,7 @@ pub fn run(
     let effective_pattern = if pattern == "." { "*" } else { pattern };
 
     if verbose > 0 {
-        eprintln!("find: {} in {}", effective_pattern, path);
+        eprintln!("find: {effective_pattern} in {path}");
     }
 
     let want_dirs = file_type == "d";
@@ -228,7 +229,7 @@ pub fn run(
         };
 
         let ft = entry.file_type();
-        let is_dir = ft.as_ref().is_some_and(|t| t.is_dir());
+        let is_dir = ft.as_ref().is_some_and(std::fs::FileType::is_dir);
 
         // Filter by type
         if want_dirs && !is_dir {
@@ -272,10 +273,10 @@ pub fn run(
     let raw_output = files.join("\n");
 
     if files.is_empty() {
-        let msg = format!("0 for '{}'", effective_pattern);
-        println!("{}", msg);
+        let msg = format!("0 for '{effective_pattern}'");
+        println!("{msg}");
         timer.track(
-            &format!("find {} -name '{}'", path, effective_pattern),
+            &format!("find {path} -name '{effective_pattern}'"),
             "rtk find",
             &raw_output,
             &msg,
@@ -290,8 +291,7 @@ pub fn run(
         let p = Path::new(file);
         let dir = p
             .parent()
-            .map(|d| d.to_string_lossy().to_string())
-            .unwrap_or_else(|| ".".to_string());
+            .map_or_else(|| ".".to_string(), |d| d.to_string_lossy().to_string());
         let dir = if dir.is_empty() { ".".to_string() } else { dir };
         let filename = p
             .file_name()
@@ -305,7 +305,7 @@ pub fn run(
     let dirs_count = dirs.len();
     let total_files = files.len();
 
-    println!("{}F {}D:", total_files, dirs_count);
+    println!("{total_files}F {dirs_count}D:");
     println!();
 
     // Display with proper --max limiting (count individual files)
@@ -348,8 +348,7 @@ pub fn run(
     for file in &files {
         let ext = Path::new(file)
             .extension()
-            .map(|e| e.to_string_lossy().to_string())
-            .unwrap_or_else(|| "none".to_string());
+            .map_or_else(|| "none".to_string(), |e| e.to_string_lossy().to_string());
         *by_ext.entry(ext).or_default() += 1;
     }
 
@@ -361,15 +360,15 @@ pub fn run(
         let ext_str: Vec<String> = exts
             .iter()
             .take(5)
-            .map(|(e, c)| format!(".{}({})", e, c))
+            .map(|(e, c)| format!(".{e}({c})"))
             .collect();
         ext_line = format!("ext: {}", ext_str.join(" "));
-        println!("{}", ext_line);
+        println!("{ext_line}");
     }
 
-    let rtk_output = format!("{}F {}D + {}", total_files, dirs_count, ext_line);
+    let rtk_output = format!("{total_files}F {dirs_count}D + {ext_line}");
     timer.track(
-        &format!("find {} -name '{}'", path, effective_pattern),
+        &format!("find {path} -name '{effective_pattern}'"),
         "rtk find",
         &raw_output,
         &rtk_output,
@@ -384,7 +383,10 @@ mod tests {
 
     /// Convert string slices to Vec<String> for test convenience.
     fn args(values: &[&str]) -> Vec<String> {
-        values.iter().map(|s| s.to_string()).collect()
+        values
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect()
     }
 
     // --- glob_match unit tests ---

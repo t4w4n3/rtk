@@ -192,7 +192,7 @@ impl TomlFilterRegistry {
                     if let Ok(content) = std::fs::read_to_string(project_filter_path) {
                         match Self::parse_and_compile(&content, "project") {
                             Ok(f) => filters.extend(f),
-                            Err(e) => eprintln!("[rtk] warning: .rtk/filters.toml: {}", e),
+                            Err(e) => eprintln!("[rtk] warning: .rtk/filters.toml: {e}"),
                         }
                     }
                 }
@@ -222,15 +222,15 @@ impl TomlFilterRegistry {
         let builtin = BUILTIN_TOML;
         match Self::parse_and_compile(builtin, "builtin") {
             Ok(f) => filters.extend(f),
-            Err(e) => eprintln!("[rtk] warning: builtin filters: {}", e),
+            Err(e) => eprintln!("[rtk] warning: builtin filters: {e}"),
         }
 
         TomlFilterRegistry { filters }
     }
 
     fn parse_and_compile(content: &str, source: &str) -> Result<Vec<CompiledFilter>, String> {
-        let file: TomlFilterFile = toml::from_str(content)
-            .map_err(|e| format!("TOML parse error in {}: {}", source, e))?;
+        let file: TomlFilterFile =
+            toml::from_str(content).map_err(|e| format!("TOML parse error in {source}: {e}"))?;
 
         if file.schema_version != 1 {
             return Err(format!(
@@ -243,7 +243,7 @@ impl TomlFilterRegistry {
         for (name, def) in file.filters {
             match compile_filter(name.clone(), def) {
                 Ok(f) => compiled.push(f),
-                Err(e) => eprintln!("[rtk] warning: filter '{}' in {}: {}", name, source, e),
+                Err(e) => eprintln!("[rtk] warning: filter '{name}' in {source}: {e}"),
             }
         }
         Ok(compiled)
@@ -311,17 +311,16 @@ fn compile_filter(name: String, def: TomlFilterDef) -> Result<CompiledFilter, St
         return Err("strip_lines_matching and keep_lines_matching are mutually exclusive".into());
     }
 
-    let match_regex = Regex::new(&def.match_command)
-        .map_err(|e| format!("invalid match_command regex: {}", e))?;
+    let match_regex =
+        Regex::new(&def.match_command).map_err(|e| format!("invalid match_command regex: {e}"))?;
 
     // Shadow warning: if match_command matches a Rust-handled command, this filter
     // will never activate (Clap routes before run_fallback). Warn the author.
     for cmd in RUST_HANDLED_COMMANDS {
         if match_regex.is_match(cmd) {
             eprintln!(
-                "[rtk] warning: filter '{}' match_command matches '{}' which is already \
-                 handled by a Rust module — this filter will never activate for that command",
-                name, cmd
+                "[rtk] warning: filter '{name}' match_command matches '{cmd}' which is already \
+                 handled by a Rust module — this filter will never activate for that command"
             );
             break;
         }
@@ -337,7 +336,7 @@ fn compile_filter(name: String, def: TomlFilterDef) -> Result<CompiledFilter, St
                     pattern,
                     replacement: r.replacement,
                 })
-                .map_err(|e| format!("invalid replace pattern '{}': {}", pat, e))
+                .map_err(|e| format!("invalid replace pattern '{pat}': {e}"))
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -347,13 +346,13 @@ fn compile_filter(name: String, def: TomlFilterDef) -> Result<CompiledFilter, St
         .map(|r| -> Result<CompiledMatchOutputRule, String> {
             let pat = r.pattern.clone();
             let pattern = Regex::new(&r.pattern)
-                .map_err(|e| format!("invalid match_output pattern '{}': {}", pat, e))?;
+                .map_err(|e| format!("invalid match_output pattern '{pat}': {e}"))?;
             let unless = r
                 .unless
                 .as_deref()
                 .map(|u| {
                     Regex::new(u)
-                        .map_err(|e| format!("invalid match_output unless pattern '{}': {}", u, e))
+                        .map_err(|e| format!("invalid match_output unless pattern '{u}': {e}"))
                 })
                 .transpose()?;
             Ok(CompiledMatchOutputRule {
@@ -366,11 +365,11 @@ fn compile_filter(name: String, def: TomlFilterDef) -> Result<CompiledFilter, St
 
     let line_filter = if !def.strip_lines_matching.is_empty() {
         let set = RegexSet::new(&def.strip_lines_matching)
-            .map_err(|e| format!("invalid strip_lines_matching regex: {}", e))?;
+            .map_err(|e| format!("invalid strip_lines_matching regex: {e}"))?;
         LineFilter::Strip(set)
     } else if !def.keep_lines_matching.is_empty() {
         let set = RegexSet::new(&def.keep_lines_matching)
-            .map_err(|e| format!("invalid keep_lines_matching regex: {}", e))?;
+            .map_err(|e| format!("invalid keep_lines_matching regex: {e}"))?;
         LineFilter::Keep(set)
     } else {
         LineFilter::None
@@ -500,7 +499,7 @@ pub fn apply_filter(filter: &CompiledFilter, stdout: &str) -> String {
         if total > tail {
             let omitted = total - tail;
             lines = lines[omitted..].to_vec();
-            lines.insert(0, format!("... ({} lines omitted)", omitted));
+            lines.insert(0, format!("... ({omitted} lines omitted)"));
         }
     }
 
@@ -509,7 +508,7 @@ pub fn apply_filter(filter: &CompiledFilter, stdout: &str) -> String {
         if lines.len() > max {
             let truncated = lines.len() - max;
             lines.truncate(max);
-            lines.push(format!("... ({} lines truncated)", truncated));
+            lines.push(format!("... ({truncated} lines truncated)"));
         }
     }
 
@@ -595,7 +594,7 @@ fn collect_test_outcomes(
     let file: TomlFilterFile = match toml::from_str(content) {
         Ok(f) => f,
         Err(e) => {
-            eprintln!("[rtk] warning: TOML parse error during verify: {}", e);
+            eprintln!("[rtk] warning: TOML parse error during verify: {e}");
             return;
         }
     };
@@ -608,7 +607,7 @@ fn collect_test_outcomes(
             Ok(f) => {
                 compiled_filters.insert(name, f);
             }
-            Err(e) => eprintln!("[rtk] warning: filter '{}' compilation error: {}", name, e),
+            Err(e) => eprintln!("[rtk] warning: filter '{name}' compilation error: {e}"),
         }
     }
 
@@ -622,15 +621,11 @@ fn collect_test_outcomes(
 
         tested_filter_names.insert(filter_name.clone());
 
-        let compiled = match compiled_filters.get(&filter_name) {
-            Some(f) => f,
-            None => {
-                eprintln!(
-                    "[rtk] warning: [[tests.{}]] references unknown filter",
-                    filter_name
-                );
-                continue;
-            }
+        let compiled = if let Some(f) = compiled_filters.get(&filter_name) {
+            f
+        } else {
+            eprintln!("[rtk] warning: [[tests.{filter_name}]] references unknown filter");
+            continue;
         };
 
         for test in tests {
@@ -959,8 +954,7 @@ match_command = "^cmd"
         let result = TomlFilterRegistry::parse_and_compile(builtin, "builtin");
         assert!(
             result.is_ok(),
-            "builtin filters failed to compile: {:?}",
-            result
+            "builtin filters failed to compile: {result:?}"
         );
         assert!(!result.unwrap().is_empty());
     }
@@ -1075,10 +1069,7 @@ max_lines = 999
         let savings = 100.0 - (out_words as f64 / input_words as f64 * 100.0);
         assert!(
             savings >= 60.0,
-            "terraform-plan filter: expected >=60% savings, got {:.1}% (in={} out={})",
-            savings,
-            input_words,
-            out_words
+            "terraform-plan filter: expected >=60% savings, got {savings:.1}% (in={input_words} out={out_words})"
         );
     }
 
@@ -1087,7 +1078,7 @@ max_lines = 999
         let filters = make_filters(BUILTIN_TOML);
         let filter = find_filter_in("make all", &filters).expect("make built-in");
 
-        let input = r#"make[1]: Entering directory '/home/user/project'
+        let input = r"make[1]: Entering directory '/home/user/project'
 make[2]: Entering directory '/home/user/project/src'
 gcc -O2 -Wall -c foo.c -o foo.o
 
@@ -1114,17 +1105,14 @@ ld -o myapp foo.o bar.o baz.o -lfoo
 make[1]: Entering directory '/home/user/project/docs'
 doxygen Doxyfile
 make[1]: Leaving directory '/home/user/project/docs'
-"#;
+";
         let out = apply_filter(filter, input);
         let input_words = input.split_whitespace().count();
         let out_words = out.split_whitespace().count();
         let savings = 100.0 - (out_words as f64 / input_words as f64 * 100.0);
         assert!(
             savings >= 60.0,
-            "make filter: expected >=60% savings, got {:.1}% (in={} out={})",
-            savings,
-            input_words,
-            out_words
+            "make filter: expected >=60% savings, got {savings:.1}% (in={input_words} out={out_words})"
         );
     }
 
@@ -1597,8 +1585,7 @@ match_command = "^make\\b"
         for name in &expected {
             assert!(
                 names.contains(name),
-                "Built-in filter '{}' is missing — was its .toml file deleted from src/filters/?",
-                name
+                "Built-in filter '{name}' is missing — was its .toml file deleted from src/filters/?"
             );
         }
     }
@@ -1635,14 +1622,13 @@ match_command = "^make\\b"
         let untested: Vec<&str> = all_names
             .iter()
             .filter(|name| !tested.contains(name.as_str()))
-            .map(|s| s.as_str())
+            .map(std::string::String::as_str)
             .collect();
 
         assert!(
             untested.is_empty(),
-            "The following built-in filters have no inline tests: {:?}\n\
-             Add [[tests.<name>]] entries to the corresponding src/filters/<name>.toml file.",
-            untested
+            "The following built-in filters have no inline tests: {untested:?}\n\
+             Add [[tests.<name>]] entries to the corresponding src/filters/<name>.toml file."
         );
     }
 
@@ -1665,7 +1651,7 @@ name = "strips blank lines"
 input = "output line 1\n\noutput line 2"
 expected = "output line 1\noutput line 2"
 "#;
-        let combined = format!("{}\n\n{}", BUILTIN_TOML, new_filter);
+        let combined = format!("{BUILTIN_TOML}\n\n{new_filter}");
         let filters = make_filters(&combined);
 
         // All 58 existing filters still present + 1 new = 59

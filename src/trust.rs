@@ -33,7 +33,7 @@ pub struct TrustEntry {
     pub trusted_at: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TrustStatus {
     Trusted,
     Untrusted,
@@ -114,8 +114,7 @@ pub fn check_trust(filter_path: &Path) -> Result<TrustStatus> {
         Ok(s) => s,
         Err(e) => {
             eprintln!(
-                "[rtk] WARNING: trust store unreadable ({}), treating all filters as untrusted",
-                e
+                "[rtk] WARNING: trust store unreadable ({e}), treating all filters as untrusted"
             );
             TrustStore::default()
         }
@@ -196,7 +195,7 @@ pub fn run_trust(list: bool) -> Result<()> {
         println!("{}", "═".repeat(60));
         for (path, entry) in &trusted {
             let date = entry.trusted_at.get(..10).unwrap_or(&entry.trusted_at);
-            println!("  {} (trusted {})", path, date);
+            println!("  {path} (trusted {date})");
             println!("    sha256:{}", entry.sha256);
         }
         return Ok(());
@@ -212,7 +211,7 @@ pub fn run_trust(list: bool) -> Result<()> {
     let content = String::from_utf8_lossy(&content_bytes);
 
     println!("=== .rtk/filters.toml ===");
-    println!("{}", content);
+    println!("{content}");
     println!("=========================");
     println!();
 
@@ -265,7 +264,7 @@ fn print_risk_summary(content: &str) {
     let has_dot_pattern = content.contains("pattern = \".\"") || content.contains("pattern = '.'");
 
     println!("Risk summary:");
-    println!("  Filters: {}", filter_count);
+    println!("  Filters: {filter_count}");
 
     if has_replace {
         println!("  [!] Contains 'replace' rules (can rewrite output)");
@@ -419,7 +418,7 @@ mod tests {
                 assert_eq!(expected.len(), 64);
                 assert_eq!(actual.len(), 64);
             }
-            other => panic!("Expected ContentChanged, got {:?}", other),
+            other => panic!("Expected ContentChanged, got {other:?}"),
         }
     }
 

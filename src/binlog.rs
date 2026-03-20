@@ -101,8 +101,7 @@ lazy_static! {
             .collect::<Vec<_>>()
             .join("|");
         Regex::new(&format!(
-            r"(?P<prefix>\b(?:{})\s*(?:=|:)\s*)(?P<value>[^\s;]+)",
-            keys
+            r"(?P<prefix>\b(?:{keys})\s*(?:=|:)\s*)(?P<value>[^\s;]+)"
         ))
         .expect("valid regex")
     };
@@ -337,7 +336,7 @@ fn parse_events_from_binlog(path: &Path) -> Result<ParsedBinlog> {
                     .read_7bit_i32()
                     .context("failed to read record length")?;
                 if len < 0 {
-                    anyhow::bail!("negative record length: {}", len);
+                    anyhow::bail!("negative record length: {len}");
                 }
                 reader
                     .skip(len as usize)
@@ -348,7 +347,7 @@ fn parse_events_from_binlog(path: &Path) -> Result<ParsedBinlog> {
                     .read_7bit_i32()
                     .context("failed to read event length")?;
                 if len < 0 {
-                    anyhow::bail!("negative event length: {}", len);
+                    anyhow::bail!("negative event length: {len}");
                 }
 
                 let payload = reader
@@ -530,7 +529,7 @@ fn read_deduplicated_string(
         .get(record_idx)
         .cloned()
         .map(Some)
-        .with_context(|| format!("invalid string record index {}", index))
+        .with_context(|| format!("invalid string record index {index}"))
 }
 
 fn format_ticks_duration(ticks: i64) -> String {
@@ -539,10 +538,7 @@ fn format_ticks_duration(ticks: i64) -> String {
     let hours = total_seconds / 3600;
     let minutes = (total_seconds % 3600) / 60;
     let seconds = total_seconds % 60;
-    format!(
-        "{:02}:{:02}:{:02}.{:02}",
-        hours, minutes, seconds, centiseconds
-    )
+    format!("{hours:02}:{minutes:02}:{seconds:02}.{centiseconds:02}")
 }
 
 struct BinReader<'a> {
@@ -600,7 +596,7 @@ impl<'a> BinReader<'a> {
         let mut shift = 0;
         loop {
             let byte = self.read_u8()?;
-            value |= ((byte & 0x7F) as u32) << shift;
+            value |= u32::from(byte & 0x7F) << shift;
             if (byte & 0x80) == 0 {
                 return Ok(value as i32);
             }
@@ -615,7 +611,7 @@ impl<'a> BinReader<'a> {
     fn read_dotnet_string(&mut self) -> Result<String> {
         let len = self.read_7bit_i32()?;
         if len < 0 {
-            anyhow::bail!("negative string length: {}", len);
+            anyhow::bail!("negative string length: {len}");
         }
         let bytes = self.read_exact(len as usize)?;
         String::from_utf8(bytes.to_vec()).context("invalid UTF-8 string")
@@ -712,7 +708,7 @@ pub fn parse_build_from_text(text: &str) -> BuildSummary {
                 .as_deref()
             {
                 Some("warning") => {
-                    warning_count_from_summary = warning_count_from_summary.max(count)
+                    warning_count_from_summary = warning_count_from_summary.max(count);
                 }
                 Some("error") => error_count_from_summary = error_count_from_summary.max(count),
                 _ => {}
@@ -910,8 +906,7 @@ pub fn parse_test_from_text(text: &str) -> TestSummary {
         if let Some(captures) = FAILED_TEST_HEAD_RE.captures(line) {
             let name = captures
                 .name("name")
-                .map(|m| m.as_str().trim().to_string())
-                .unwrap_or_else(|| "unknown".to_string());
+                .map_or_else(|| "unknown".to_string(), |m| m.as_str().trim().to_string());
             let mut details = Vec::new();
             idx += 1;
             while idx < lines.len() {
@@ -1189,14 +1184,14 @@ mod tests {
 
     #[test]
     fn test_parse_build_from_text_extracts_issues() {
-        let input = r#"
+        let input = r"
 Build FAILED.
 src/Program.cs(42,15): error CS0103: The name 'foo' does not exist
 src/Program.cs(25,10): warning CS0219: Variable 'x' is assigned but never used
     1 Warning(s)
     1 Error(s)
 Time Elapsed 00:00:03.45
-"#;
+";
 
         let summary = parse_build_from_text(input);
         assert!(!summary.succeeded);
@@ -1209,10 +1204,10 @@ Time Elapsed 00:00:03.45
 
     #[test]
     fn test_parse_build_from_text_extracts_warning_without_code() {
-        let input = r#"
+        let input = r"
 /Users/dev/sdk/Microsoft.TestPlatform.targets(48,5): warning
 Build succeeded with 1 warning(s) in 0.5s
-"#;
+";
 
         let summary = parse_build_from_text(input);
         assert_eq!(summary.warnings.len(), 1);
@@ -1225,9 +1220,9 @@ Build succeeded with 1 warning(s) in 0.5s
 
     #[test]
     fn test_parse_build_from_text_extracts_inline_warning_counts() {
-        let input = r#"
+        let input = r"
 Build failed with 1 error(s) and 4 warning(s) in 4.7s
-"#;
+";
 
         let summary = parse_build_from_text(input);
         assert_eq!(summary.errors.len(), 1);
@@ -1236,10 +1231,10 @@ Build failed with 1 error(s) and 4 warning(s) in 4.7s
 
     #[test]
     fn test_parse_build_from_text_extracts_msbuild_global_error() {
-        let input = r#"
+        let input = r"
 MSBUILD : error MSB1009: Project file does not exist.
 Switch: /tmp/nonexistent.csproj
-"#;
+";
 
         let summary = parse_build_from_text(input);
         assert_eq!(summary.errors.len(), 1);
@@ -1252,7 +1247,7 @@ Switch: /tmp/nonexistent.csproj
 
     #[test]
     fn test_parse_test_from_text_extracts_failure_summary() {
-        let input = r#"
+        let input = r"
 Failed!  - Failed:     2, Passed:   245, Skipped:     0, Total:   247, Duration: 1 s
   Failed MyApp.Tests.UnitTests.CalculatorTests.Add_ShouldReturnSum [5 ms]
   Error Message:
@@ -1261,7 +1256,7 @@ Failed!  - Failed:     2, Passed:   245, Skipped:     0, Total:   247, Duration:
   Failed MyApp.Tests.IntegrationTests.DatabaseTests.CanConnect [20 ms]
   Error Message:
    System.InvalidOperationException: Connection refused
-"#;
+";
 
         let summary = parse_test_from_text(input);
         assert_eq!(summary.passed, 245);
@@ -1275,7 +1270,7 @@ Failed!  - Failed:     2, Passed:   245, Skipped:     0, Total:   247, Duration:
 
     #[test]
     fn test_parse_test_from_text_keeps_multiline_failure_details() {
-        let input = r#"
+        let input = r"
 Failed!  - Failed:     1, Passed:   10, Skipped:     0, Total:   11, Duration: 1 s
   Failed MyApp.Tests.SampleTests.ShouldFail [5 ms]
   Error Message:
@@ -1285,7 +1280,7 @@ Failed!  - Failed:     1, Passed:   10, Skipped:     0, Total:   11, Duration: 1
 
    Stack Trace:
       at MyApp.Tests.SampleTests.ShouldFail() in /repo/SampleTests.cs:line 42
-"#;
+";
 
         let summary = parse_test_from_text(input);
         assert_eq!(summary.failed, 1);
@@ -1298,10 +1293,10 @@ Failed!  - Failed:     1, Passed:   10, Skipped:     0, Total:   11, Duration: 1
 
     #[test]
     fn test_parse_test_from_text_ignores_non_test_failed_prefix_lines() {
-        let input = r#"
+        let input = r"
 Passed!  - Failed:     0, Passed:   940, Skipped:     7, Total:   947, Duration: 1 s
   Failed to load prune package data from PrunePackageData folder, loading from targeting packs instead
-"#;
+";
 
         let summary = parse_test_from_text(input);
         assert_eq!(summary.failed, 0);
@@ -1310,11 +1305,11 @@ Passed!  - Failed:     0, Passed:   940, Skipped:     7, Total:   947, Duration:
 
     #[test]
     fn test_parse_test_from_text_aggregates_multiple_project_summaries() {
-        let input = r#"
+        let input = r"
 Passed!  - Failed:     0, Passed:   914, Skipped:     7, Total:   921, Duration: 00:00:08.20
 Failed!  - Failed:     1, Passed:    26, Skipped:     0, Total:    27, Duration: 00:00:00.54
 Time Elapsed 00:00:12.34
-"#;
+";
 
         let summary = parse_test_from_text(input);
         assert_eq!(summary.passed, 940);
@@ -1326,11 +1321,11 @@ Time Elapsed 00:00:12.34
 
     #[test]
     fn test_parse_test_from_text_prefers_test_summary_duration_and_counts() {
-        let input = r#"
+        let input = r"
 Failed!  - Failed:     1, Passed:   940, Skipped:     7, Total:   948, Duration: 1 s
 Test summary: total: 949, failed: 1, succeeded: 940, skipped: 7, duration: 2.7s
 Build failed with 1 error(s) and 4 warning(s) in 6.0s
-"#;
+";
 
         let summary = parse_test_from_text(input);
         assert_eq!(summary.passed, 940);
@@ -1342,10 +1337,10 @@ Build failed with 1 error(s) and 4 warning(s) in 6.0s
 
     #[test]
     fn test_parse_restore_from_text_extracts_project_count() {
-        let input = r#"
+        let input = r"
   Restored /tmp/App/App.csproj (in 1.1 sec).
   Restored /tmp/App.Tests/App.Tests.csproj (in 1.2 sec).
-"#;
+";
 
         let summary = parse_restore_from_text(input);
         assert_eq!(summary.restored_projects, 2);
@@ -1354,11 +1349,11 @@ Build failed with 1 error(s) and 4 warning(s) in 6.0s
 
     #[test]
     fn test_parse_restore_from_text_extracts_nuget_error_diagnostic() {
-        let input = r#"
+        let input = r"
 /Users/dev/src/App/App.csproj : error NU1101: Unable to find package Foo.Bar. No packages exist with this id in source(s): nuget.org
 
 Restore failed with 1 error(s) in 1.0s
-"#;
+";
 
         let summary = parse_restore_from_text(input);
         assert_eq!(summary.errors, 1);
@@ -1367,12 +1362,12 @@ Restore failed with 1 error(s) in 1.0s
 
     #[test]
     fn test_parse_restore_issues_ignores_summary_warning_error_counts() {
-        let input = r#"
+        let input = r"
   0 Warning(s)
   1 Error(s)
 
   Time Elapsed 00:00:01.23
-"#;
+";
 
         let (errors, warnings) = parse_restore_issues_from_text(input);
         assert_eq!(errors.len(), 0);
@@ -1389,8 +1384,7 @@ Restore failed with 1 error(s) in 1.0s
         let err = parse_build(&binlog_path).expect_err("parse should fail");
         assert!(
             err.to_string().contains("Failed to parse binlog"),
-            "unexpected error: {}",
-            err
+            "unexpected error: {err}"
         );
     }
 
@@ -1402,8 +1396,7 @@ Restore failed with 1 error(s) in 1.0s
         let err = parse_build(&binlog_path).expect_err("parse should fail");
         assert!(
             err.to_string().contains("Failed to parse binlog"),
-            "unexpected error: {}",
-            err
+            "unexpected error: {err}"
         );
     }
 
@@ -1515,8 +1508,7 @@ Restore failed with 1 error(s) in 1.0s
         let err = parse_test(&binlog_path).expect_err("parse should fail");
         assert!(
             err.to_string().contains("Failed to parse binlog"),
-            "unexpected error: {}",
-            err
+            "unexpected error: {err}"
         );
     }
 
@@ -1528,8 +1520,7 @@ Restore failed with 1 error(s) in 1.0s
         let err = parse_restore(&binlog_path).expect_err("parse should fail");
         assert!(
             err.to_string().contains("Failed to parse binlog"),
-            "unexpected error: {}",
-            err
+            "unexpected error: {err}"
         );
     }
 
@@ -1545,7 +1536,7 @@ Restore failed with 1 error(s) in 1.0s
 
     #[test]
     fn test_parse_build_sets_project_count_floor() {
-        let input = r#"
+        let input = r"
 RtkDotnetSmoke -> /tmp/RtkDotnetSmoke.dll
 
 Build succeeded.
@@ -1553,7 +1544,7 @@ Build succeeded.
     0 Error(s)
 
 Time Elapsed 00:00:00.12
-"#;
+";
 
         let summary = parse_build_from_text(input);
         assert_eq!(summary.project_count, 1);

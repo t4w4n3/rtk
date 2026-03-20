@@ -75,7 +75,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        eprint!("{}", stderr);
+        eprint!("{stderr}");
         std::process::exit(output.status.code().unwrap_or(1));
     }
 
@@ -95,7 +95,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         );
     }
 
-    print!("{}", filtered);
+    print!("{filtered}");
     timer.track("tree", "rtk tree", &raw, &filtered);
 
     Ok(())
@@ -184,8 +184,7 @@ mod tests {
             let output = filter_tree_output(input);
             assert!(
                 !output.contains(summary_fragment),
-                "Should remove summary '{}' from output",
-                summary_fragment
+                "Should remove summary '{summary_fragment}' from output"
             );
             assert!(
                 output.contains("file.txt"),

@@ -413,7 +413,7 @@ impl Tracker {
                 Utc::now().to_rfc3339(),
                 raw_command,
                 error_message,
-                fallback_succeeded as i32,
+                i32::from(fallback_succeeded),
             ],
         )?;
         self.cleanup_old()?;
@@ -886,8 +886,7 @@ impl Tracker {
             |row| {
                 Ok(CommandRecord {
                     timestamp: DateTime::parse_from_rfc3339(&row.get::<_, String>(0)?)
-                        .map(|dt| dt.with_timezone(&Utc))
-                        .unwrap_or_else(|_| Utc::now()),
+                        .map_or_else(|_| Utc::now(), |dt| dt.with_timezone(&Utc)),
                     rtk_cmd: row.get(1)?,
                     saved_tokens: row.get::<_, i64>(2)? as usize,
                     savings_pct: row.get(3)?,
@@ -920,7 +919,7 @@ impl Tracker {
             // Extract just the command name (e.g. "rtk git status" → "git")
             Ok(cmd.split_whitespace().nth(1).unwrap_or(&cmd).to_string())
         })?;
-        Ok(rows.filter_map(|r| r.ok()).collect())
+        Ok(rows.filter_map(std::result::Result::ok).collect())
     }
 
     /// Get overall savings percentage (for telemetry).
@@ -1253,8 +1252,8 @@ mod tests {
 
         // Use unique test identifiers
         let pid = std::process::id();
-        let cmd1 = format!("rtk cmd1_test_{}", pid);
-        let cmd2 = format!("rtk cmd2_passthrough_test_{}", pid);
+        let cmd1 = format!("rtk cmd1_test_{pid}");
+        let cmd2 = format!("rtk cmd2_passthrough_test_{pid}");
 
         // Record one real command with 80% savings
         tracker
@@ -1412,13 +1411,13 @@ mod tests {
 
         // 2 successes, 1 failure
         tracker
-            .record_parse_failure(&format!("cmd_ok1_{}", pid), "err", true)
+            .record_parse_failure(&format!("cmd_ok1_{pid}"), "err", true)
             .unwrap();
         tracker
-            .record_parse_failure(&format!("cmd_ok2_{}", pid), "err", true)
+            .record_parse_failure(&format!("cmd_ok2_{pid}"), "err", true)
             .unwrap();
         tracker
-            .record_parse_failure(&format!("cmd_fail_{}", pid), "err", false)
+            .record_parse_failure(&format!("cmd_fail_{pid}"), "err", false)
             .unwrap();
 
         let summary = tracker.get_parse_failure_summary().unwrap();

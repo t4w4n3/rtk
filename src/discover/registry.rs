@@ -33,9 +33,7 @@ pub fn category_avg_tokens(category: &str, subcmd: &str) -> usize {
         "Files" => 100,
         "Build" => 300,
         "Infra" => 120,
-        "Network" => 150,
         "GitHub" => 200,
-        "PackageManager" => 150,
         _ => 150,
     }
 }
@@ -120,16 +118,14 @@ pub fn classify_command(cmd: &str) -> Classification {
                     .subcmd_status
                     .iter()
                     .find(|(s, _)| *s == subcmd)
-                    .map(|(_, st)| *st)
-                    .unwrap_or(super::report::RtkStatus::Existing);
+                    .map_or(super::report::RtkStatus::Existing, |(_, st)| *st);
 
                 // Check if this subcommand has custom savings
                 let savings = rule
                     .subcmd_savings
                     .iter()
                     .find(|(s, _)| *s == subcmd)
-                    .map(|(_, pct)| *pct)
-                    .unwrap_or(rule.savings_pct);
+                    .map_or(rule.savings_pct, |(_, pct)| *pct);
 
                 (savings, status)
             } else {
@@ -222,20 +218,16 @@ pub fn split_command_chain(cmd: &str) -> Vec<&str> {
                 i += 1;
             }
             b'|' if !in_single && !in_double => {
+                let segment = trimmed[start..i].trim();
+                if !segment.is_empty() {
+                    results.push(segment);
+                }
                 if i + 1 < len && bytes[i + 1] == b'|' {
                     // ||
-                    let segment = trimmed[start..i].trim();
-                    if !segment.is_empty() {
-                        results.push(segment);
-                    }
                     i += 2;
                     start = i;
                 } else {
                     // pipe: keep only first command
-                    let segment = trimmed[start..i].trim();
-                    if !segment.is_empty() {
-                        results.push(segment);
-                    }
                     pipe_seen = true;
                     break;
                 }
@@ -383,9 +375,9 @@ fn rewrite_compound(cmd: &str, excluded: &[String]) -> Option<String> {
                 i += 1;
             }
             b'|' if !in_single && !in_double => {
+                let seg = cmd[seg_start..i].trim();
                 if i + 1 < len && bytes[i + 1] == b'|' {
                     // `||` operator — rewrite left, continue
-                    let seg = cmd[seg_start..i].trim();
                     let rewritten =
                         rewrite_segment(seg, excluded).unwrap_or_else(|| seg.to_string());
                     if rewritten != seg {
@@ -400,7 +392,6 @@ fn rewrite_compound(cmd: &str, excluded: &[String]) -> Option<String> {
                     seg_start = i;
                 } else {
                     // `|` pipe — rewrite first segment only, pass through the rest unchanged
-                    let seg = cmd[seg_start..i].trim();
                     // Skip rewriting `find`/`fd` in pipes — rtk find outputs a grouped
                     // format that is incompatible with pipe consumers like xargs, grep,
                     // wc, sort, etc. which expect one path per line (#439).
@@ -512,12 +503,12 @@ fn rewrite_head_numeric(cmd: &str) -> Option<String> {
     if let Some(caps) = HEAD_N.captures(cmd) {
         let n = caps.get(1)?.as_str();
         let file = caps.get(2)?.as_str();
-        return Some(format!("rtk read {} --max-lines {}", file, n));
+        return Some(format!("rtk read {file} --max-lines {n}"));
     }
     if let Some(caps) = HEAD_LINES.captures(cmd) {
         let n = caps.get(1)?.as_str();
         let file = caps.get(2)?.as_str();
-        return Some(format!("rtk read {} --max-lines {}", file, n));
+        return Some(format!("rtk read {file} --max-lines {n}"));
     }
     // head with any other flag (e.g. -c, -q): skip rewriting to avoid clap errors
     if cmd.starts_with("head -") {
@@ -548,7 +539,7 @@ fn rewrite_tail_lines(cmd: &str) -> Option<String> {
         if let Some(caps) = re.captures(cmd) {
             let n = caps.get(1)?.as_str();
             let file = caps.get(2)?.as_str();
-            return Some(format!("rtk read {} --tail-lines {}", file, n));
+            return Some(format!("rtk read {file} --tail-lines {n}"));
         }
     }
 
@@ -736,7 +727,7 @@ mod tests {
         ];
         for cmd in &write_commands {
             if let Classification::Supported { .. } = classify_command(cmd) {
-                panic!("{} should NOT be classified as Supported", cmd)
+                panic!("{cmd} should NOT be classified as Supported")
             }
             // Unsupported or Ignored is fine
         }
@@ -766,7 +757,7 @@ mod tests {
             Classification::Unsupported { base_command } => {
                 assert_eq!(base_command, "htop");
             }
-            other => panic!("expected Unsupported, got {:?}", other),
+            other => panic!("expected Unsupported, got {other:?}"),
         }
     }
 
@@ -1027,8 +1018,7 @@ mod tests {
                     ..
                 }
             ),
-            "git -C should be classified as supported, got: {:?}",
-            result
+            "git -C should be classified as supported, got: {result:?}"
         );
     }
 

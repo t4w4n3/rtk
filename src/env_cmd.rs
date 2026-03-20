@@ -69,13 +69,13 @@ pub fn run(filter: Option<&str>, show_all: bool, verbose: u8) -> Result<()> {
                 let paths: Vec<&str> = v.split(':').collect();
                 println!("  PATH ({} entries):", paths.len());
                 for p in paths.iter().take(5) {
-                    println!("    {}", p);
+                    println!("    {p}");
                 }
                 if paths.len() > 5 {
                     println!("    ... +{} more", paths.len() - 5);
                 }
             } else {
-                println!("  {}={}", k, v);
+                println!("  {k}={v}");
             }
         }
     }
@@ -83,28 +83,28 @@ pub fn run(filter: Option<&str>, show_all: bool, verbose: u8) -> Result<()> {
     if !lang_vars.is_empty() {
         println!("\nLanguage/Runtime:");
         for (k, v) in &lang_vars {
-            println!("  {}={}", k, v);
+            println!("  {k}={v}");
         }
     }
 
     if !cloud_vars.is_empty() {
         println!("\nCloud/Services:");
         for (k, v) in &cloud_vars {
-            println!("  {}={}", k, v);
+            println!("  {k}={v}");
         }
     }
 
     if !tool_vars.is_empty() {
         println!("\nTools:");
         for (k, v) in &tool_vars {
-            println!("  {}={}", k, v);
+            println!("  {k}={v}");
         }
     }
 
     if !other_vars.is_empty() {
         println!("\nOther:");
         for (k, v) in other_vars.iter().take(20) {
-            println!("  {}={}", k, v);
+            println!("  {k}={v}");
         }
         if other_vars.len() > 20 {
             println!("  ... +{} more", other_vars.len() - 20);
@@ -118,11 +118,15 @@ pub fn run(filter: Option<&str>, show_all: bool, verbose: u8) -> Result<()> {
         + tool_vars.len()
         + other_vars.len().min(20);
     if filter.is_none() {
-        println!("\nTotal: {} vars (showing {} relevant)", total, shown);
+        println!("\nTotal: {total} vars (showing {shown} relevant)");
     }
 
-    let raw: String = vars.iter().map(|(k, v)| format!("{}={}\n", k, v)).collect();
-    let rtk = format!("{} vars -> {} shown", total, shown);
+    use std::fmt::Write;
+    let raw = vars.iter().fold(String::new(), |mut acc, (k, v)| {
+        let _ = writeln!(acc, "{k}={v}");
+        acc
+    });
+    let rtk = format!("{total} vars -> {shown} shown");
     timer.track("env", "rtk env", &raw, &rtk);
     Ok(())
 }
@@ -150,7 +154,7 @@ fn mask_value(value: &str) -> String {
     } else {
         let prefix: String = chars[..2].iter().collect();
         let suffix: String = chars[chars.len() - 2..].iter().collect();
-        format!("{}****{}", prefix, suffix)
+        format!("{prefix}****{suffix}")
     }
 }
 

@@ -4,7 +4,7 @@ const CURRENT_HOOK_VERSION: u8 = 2;
 const WARN_INTERVAL_SECS: u64 = 24 * 3600;
 
 /// Hook status for diagnostics and `rtk gain`.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum HookStatus {
     /// Hook is installed and up to date.
     Ok,
@@ -65,7 +65,7 @@ fn check_and_warn() -> Option<()> {
         }
     }
 
-    eprintln!("{}", warning);
+    eprintln!("{warning}");
 
     // Touch marker after warning is printed
     let _ = std::fs::create_dir_all(marker.parent()?);
@@ -136,7 +136,7 @@ mod tests {
         assert_eq!(HookStatus::Ok, HookStatus::Ok);
         // Clone works
         let s = HookStatus::Missing;
-        assert_eq!(s.clone(), HookStatus::Missing);
+        assert_eq!(s, HookStatus::Missing);
     }
 
     #[test]
@@ -164,8 +164,7 @@ mod tests {
         let s = status();
         assert!(
             s == HookStatus::Ok || s == HookStatus::Outdated,
-            "Expected Ok or Outdated when hook exists, got {:?}",
-            s
+            "Expected Ok or Outdated when hook exists, got {s:?}"
         );
     }
 }

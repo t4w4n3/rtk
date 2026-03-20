@@ -141,8 +141,7 @@ fn collect_test_results(
                             .find(|r| r.status == "failed" || r.status == "timedOut")
                     })
                     .and_then(|r| r.errors.first())
-                    .map(|e| e.message.clone())
-                    .unwrap_or_else(|| "Test failed".to_string());
+                    .map_or_else(|| "Test failed".to_string(), |e| e.message.clone());
 
                 failures.push(TestFailure {
                     test_name: spec.title.clone(),
@@ -191,7 +190,6 @@ fn extract_playwright_regex(output: &str) -> Option<TestResult> {
         let value: f64 = caps[1].parse().ok()?;
         let unit = &caps[2];
         Some(match unit {
-            "ms" => value as u64,
             "s" => (value * 1000.0) as u64,
             "m" => (value * 60000.0) as u64,
             _ => value as u64,
@@ -263,7 +261,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     };
 
     // Only inject --reporter=json for `playwright test` runs
-    let is_test = args.first().map(|a| a == "test").unwrap_or(false);
+    let is_test = args.first().is_some_and(|a| a == "test");
     if is_test {
         cmd.arg("test");
         cmd.arg("--reporter=json");
@@ -289,7 +287,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let raw = format!("{}\n{}", stdout, stderr);
+    let raw = format!("{stdout}\n{stderr}");
 
     // Parse output using PlaywrightParser
     let parse_result = PlaywrightParser::parse(&stdout);
@@ -314,7 +312,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         }
     };
 
-    println!("{}", filtered);
+    println!("{filtered}");
 
     timer.track(
         &format!("playwright {}", args.join(" ")),

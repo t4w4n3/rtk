@@ -44,12 +44,12 @@ pub fn run_format(args: &[String], verbose: u8) -> Result<()> {
     let output = cmd.output().context("Failed to run dotnet format")?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let raw = format!("{}\n{}", stdout, stderr);
+    let raw = format!("{stdout}\n{stderr}");
 
     let check_mode = !has_write_mode_override(args);
     let filtered =
         format_report_summary_or_raw(report_path.as_deref(), check_mode, &raw, command_started_at);
-    println!("{}", filtered);
+    println!("{filtered}");
 
     timer.track(
         &format!("dotnet format {}", args.join(" ")),
@@ -87,23 +87,23 @@ pub fn run_passthrough(args: &[OsString], verbose: u8) -> Result<()> {
     }
 
     if verbose > 0 {
-        eprintln!("Running: dotnet {} ...", subcommand);
+        eprintln!("Running: dotnet {subcommand} ...");
     }
 
     let output = cmd
         .output()
-        .with_context(|| format!("Failed to run dotnet {}", subcommand))?;
+        .with_context(|| format!("Failed to run dotnet {subcommand}"))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let raw = format!("{}\n{}", stdout, stderr);
+    let raw = format!("{stdout}\n{stderr}");
 
-    print!("{}", stdout);
-    eprint!("{}", stderr);
+    print!("{stdout}");
+    eprint!("{stderr}");
 
     timer.track(
-        &format!("dotnet {}", subcommand),
-        &format!("rtk dotnet {}", subcommand),
+        &format!("dotnet {subcommand}"),
+        &format!("rtk dotnet {subcommand}"),
         &raw,
         &raw,
     );
@@ -140,11 +140,11 @@ fn run_dotnet_with_binlog(subcommand: &str, args: &[String], verbose: u8) -> Res
     let command_started_at = SystemTime::now();
     let output = cmd
         .output()
-        .with_context(|| format!("Failed to run dotnet {}", subcommand))?;
+        .with_context(|| format!("Failed to run dotnet {subcommand}"))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let raw = format!("{}\n{}", stdout, stderr);
+    let raw = format!("{stdout}\n{stderr}");
 
     let filtered = match subcommand {
         "build" => {
@@ -222,21 +222,21 @@ fn run_dotnet_with_binlog(subcommand: &str, args: &[String], verbose: u8) -> Res
         _ => raw.clone(),
     };
 
-    let output_to_print = if !output.status.success() {
+    let output_to_print = if output.status.success() {
+        filtered
+    } else {
         let stdout_trimmed = stdout.trim();
         let stderr_trimmed = stderr.trim();
         if !stdout_trimmed.is_empty() {
-            format!("{}\n\n{}", stdout_trimmed, filtered)
+            format!("{stdout_trimmed}\n\n{filtered}")
         } else if !stderr_trimmed.is_empty() {
-            format!("{}\n\n{}", stderr_trimmed, filtered)
+            format!("{stderr_trimmed}\n\n{filtered}")
         } else {
             filtered
         }
-    } else {
-        filtered
     };
 
-    println!("{}", output_to_print);
+    println!("{output_to_print}");
 
     timer.track(
         &format!("dotnet {} {}", subcommand, args.join(" ")),
@@ -284,7 +284,7 @@ fn unique_temp_suffix() -> String {
     let seq = TEMP_PATH_COUNTER.fetch_add(1, Ordering::Relaxed);
 
     // Keep suffix compact to avoid long temp paths while preserving practical uniqueness.
-    format!("{:x}{:x}{:x}", ts, pid, seq)
+    format!("{ts:x}{pid:x}{seq:x}")
 }
 
 fn resolve_trx_results_dir(subcommand: &str, args: &[String]) -> (Option<PathBuf>, bool) {
@@ -385,7 +385,7 @@ fn format_dotnet_format_output(
         );
     }
 
-    let mut output = format!("Format: {} files need formatting", changed_count);
+    let mut output = format!("Format: {changed_count} files need formatting");
     output.push_str("\n---------------------------------------");
 
     for (index, file) in summary.files_with_changes.iter().take(20).enumerate() {
@@ -833,8 +833,7 @@ fn format_test_output(
 
     let mut out = if counts_unavailable {
         format!(
-            "{} dotnet test: completed (binlog-only mode, counts unavailable, {} warnings) ({})",
-            status_icon, warning_count, duration
+            "{status_icon} dotnet test: completed (binlog-only mode, counts unavailable, {warning_count} warnings) ({duration})"
         )
     } else if has_failures {
         format!(
@@ -961,10 +960,9 @@ mod tests {
             r#"<?xml version="1.0" encoding="utf-8"?>
 <TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
   <ResultSummary outcome="Completed">
-    <Counters total="{}" executed="{}" passed="{}" failed="{}" error="0" />
+    <Counters total="{total}" executed="{total}" passed="{passed}" failed="{failed}" error="0" />
   </ResultSummary>
-</TestRun>"#,
-            total, total, passed, failed
+</TestRun>"#
         )
     }
 

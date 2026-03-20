@@ -123,12 +123,11 @@ pub fn is_available() -> bool {
 /// Returns `Ok(Some(vec))` with parsed data on success
 /// Returns `Err` only on unexpected failures (JSON parse, etc.)
 pub fn fetch(granularity: Granularity) -> Result<Option<Vec<CcusagePeriod>>> {
-    let mut cmd = match build_command() {
-        Some(cmd) => cmd,
-        None => {
-            eprintln!("[warn] ccusage not found. Install: npm i -g ccusage (or use npx ccusage)");
-            return Ok(None);
-        }
+    let mut cmd = if let Some(cmd) = build_command() {
+        cmd
+    } else {
+        eprintln!("[warn] ccusage not found. Install: npm i -g ccusage (or use npx ccusage)");
+        return Ok(None);
     };
 
     let subcommand = match granularity {
@@ -146,7 +145,7 @@ pub fn fetch(granularity: Granularity) -> Result<Option<Vec<CcusagePeriod>>> {
 
     let output = match output {
         Err(e) => {
-            eprintln!("[warn] ccusage execution failed: {}", e);
+            eprintln!("[warn] ccusage execution failed: {e}");
             return Ok(None);
         }
         Ok(o) => o,

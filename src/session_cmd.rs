@@ -111,9 +111,9 @@ pub fn run(_verbose: u8) -> Result<()> {
         let short_id = if id.len() > 8 { &id[..8] } else { id };
 
         // Extract date from mtime
-        let date = fs::metadata(path)
-            .and_then(|m| m.modified())
-            .map(|t| {
+        let date = fs::metadata(path).and_then(|m| m.modified()).map_or_else(
+            |_| "?".to_string(),
+            |t| {
                 let elapsed = std::time::SystemTime::now()
                     .duration_since(t)
                     .unwrap_or_default();
@@ -123,10 +123,10 @@ pub fn run(_verbose: u8) -> Result<()> {
                 } else if days == 1 {
                     "Yesterday".to_string()
                 } else {
-                    format!("{}d ago", days)
+                    format!("{days}d ago")
                 }
-            })
-            .unwrap_or_else(|_| "?".to_string());
+            },
+        );
 
         summaries.push(SessionSummary {
             id: short_id.to_string(),
@@ -144,7 +144,7 @@ pub fn run(_verbose: u8) -> Result<()> {
 
     // Display table
     let header = "RTK Session Overview (last 10)";
-    println!("{}", header);
+    println!("{header}");
     println!("{}", "-".repeat(70));
     println!(
         "{:<12} {:<12} {:>5} {:>5} {:>9} {:<7} {:>8}",
@@ -180,7 +180,7 @@ pub fn run(_verbose: u8) -> Result<()> {
     } else {
         0.0
     };
-    println!("Average adoption: {:.0}%", avg_adoption);
+    println!("Average adoption: {avg_adoption:.0}%");
     println!("Tip: Run `rtk discover` to find missed RTK opportunities");
 
     Ok(())
@@ -359,7 +359,7 @@ mod tests {
 
         let mut tmp = NamedTempFile::new().expect("create tempfile");
         for line in &jsonl {
-            writeln!(tmp, "{}", line).expect("write line");
+            writeln!(tmp, "{line}").expect("write line");
         }
 
         let provider = ClaudeProvider;
@@ -383,7 +383,7 @@ mod tests {
 
         let mut tmp = NamedTempFile::new().expect("create tempfile");
         for line in &jsonl {
-            writeln!(tmp, "{}", line).expect("write line");
+            writeln!(tmp, "{line}").expect("write line");
         }
 
         let provider = ClaudeProvider;
@@ -404,7 +404,7 @@ mod tests {
 
         let mut tmp = NamedTempFile::new().expect("create tempfile");
         for line in &jsonl {
-            writeln!(tmp, "{}", line).expect("write line");
+            writeln!(tmp, "{line}").expect("write line");
         }
 
         let provider = ClaudeProvider;
@@ -424,7 +424,7 @@ mod tests {
 
         let mut tmp = NamedTempFile::new().expect("create tempfile");
         for line in &jsonl {
-            writeln!(tmp, "{}", line).expect("write line");
+            writeln!(tmp, "{line}").expect("write line");
         }
 
         let provider = ClaudeProvider;

@@ -17,8 +17,7 @@ pub fn run(file: &Path, _model: &str, _force_download: bool, verbose: u8) -> Res
     let lang = file
         .extension()
         .and_then(|e| e.to_str())
-        .map(Language::from_extension)
-        .unwrap_or(Language::Unknown);
+        .map_or(Language::Unknown, Language::from_extension);
 
     let summary = analyze_code(&content, &lang);
 
@@ -34,8 +33,7 @@ struct CodeSummary {
 }
 
 fn analyze_code(content: &str, lang: &Language) -> CodeSummary {
-    let lines: Vec<&str> = content.lines().collect();
-    let total_lines = lines.len();
+    let total_lines = content.lines().count();
 
     // Extract components
     let imports = extract_imports(content, lang);
@@ -49,13 +47,13 @@ fn analyze_code(content: &str, lang: &Language) -> CodeSummary {
     // Build line 1: What it is
     let lang_name = lang_display_name(lang);
     let main_type = if !structs.is_empty() && !functions.is_empty() {
-        format!("{} module", lang_name)
+        format!("{lang_name} module")
     } else if !structs.is_empty() {
-        format!("{} data structures", lang_name)
+        format!("{lang_name} data structures")
     } else if !functions.is_empty() {
-        format!("{} functions", lang_name)
+        format!("{lang_name} functions")
     } else {
-        format!("{} code", lang_name)
+        format!("{lang_name} code")
     };
 
     let components: Vec<String> = [
@@ -68,7 +66,7 @@ fn analyze_code(content: &str, lang: &Language) -> CodeSummary {
     .collect();
 
     let line1 = if components.is_empty() {
-        format!("{} ({} lines)", main_type, total_lines)
+        format!("{main_type} ({total_lines} lines)")
     } else {
         format!(
             "{} ({}) - {} lines",
@@ -83,7 +81,11 @@ fn analyze_code(content: &str, lang: &Language) -> CodeSummary {
 
     // Main imports/dependencies
     if !imports.is_empty() {
-        let key_imports: Vec<&str> = imports.iter().take(3).map(|s| s.as_str()).collect();
+        let key_imports: Vec<&str> = imports
+            .iter()
+            .take(3)
+            .map(std::string::String::as_str)
+            .collect();
         details.push(format!("uses: {}", key_imports.join(", ")));
     }
 
@@ -94,7 +96,11 @@ fn analyze_code(content: &str, lang: &Language) -> CodeSummary {
 
     // Main functions/structs
     if !functions.is_empty() {
-        let key_fns: Vec<&str> = functions.iter().take(3).map(|s| s.as_str()).collect();
+        let key_fns: Vec<&str> = functions
+            .iter()
+            .take(3)
+            .map(std::string::String::as_str)
+            .collect();
         if details.is_empty() {
             details.push(format!("defines: {}", key_fns.join(", ")));
         }
@@ -143,7 +149,10 @@ fn extract_imports(content: &str, lang: &Language) -> Vec<String> {
 
     for line in content.lines() {
         if let Some(caps) = re.captures(line) {
-            let import = caps.get(1).or(caps.get(2)).map(|m| m.as_str().to_string());
+            let import = caps
+                .get(1)
+                .or_else(|| caps.get(2))
+                .map(|m| m.as_str().to_string());
             if let Some(imp) = import {
                 let base = imp.split("::").next().unwrap_or(&imp).to_string();
                 if !seen.contains(&base) && !is_std_import(&base, lang) {
@@ -181,7 +190,10 @@ fn extract_functions(content: &str, lang: &Language) -> Vec<String> {
 
     for line in content.lines() {
         if let Some(caps) = re.captures(line) {
-            let name = caps.get(1).or(caps.get(2)).map(|m| m.as_str().to_string());
+            let name = caps
+                .get(1)
+                .or_else(|| caps.get(2))
+                .map(|m| m.as_str().to_string());
             if let Some(n) = name {
                 if !n.starts_with("test_") && n != "main" && n != "new" {
                     functions.push(n);

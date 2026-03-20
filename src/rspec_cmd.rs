@@ -19,7 +19,6 @@ lazy_static! {
     static ref RE_SIMPLECOV: Regex =
         Regex::new(r"(?i)(coverage report|simplecov|coverage/|\.simplecov|All Files.*Lines)")
             .unwrap();
-    static ref RE_DEPRECATION: Regex = Regex::new(r"^DEPRECATION WARNING:").unwrap();
     static ref RE_FINISHED_IN: Regex = Regex::new(r"^Finished in \d").unwrap();
     static ref RE_SCREENSHOT: Regex = Regex::new(r"saved screenshot to (.+)").unwrap();
     static ref RE_RSPEC_SUMMARY: Regex = Regex::new(r"(\d+) examples?, (\d+) failures?").unwrap();
@@ -93,7 +92,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let raw = format!("{}\n{}", stdout, stderr);
+    let raw = format!("{stdout}\n{stderr}");
 
     let exit_code = exit_code_from_output(&output, "rspec");
 
@@ -108,9 +107,9 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     };
 
     if let Some(hint) = crate::tee::tee_and_hint(&raw, "rspec", exit_code) {
-        println!("{}\n{}", filtered, hint);
+        println!("{filtered}\n{hint}");
     } else {
-        println!("{}", filtered);
+        println!("{filtered}");
     }
 
     if !stderr.trim().is_empty() && (!output.status.success() || verbose > 0) {
@@ -148,7 +147,7 @@ fn strip_noise(output: &str) -> String {
         }
 
         // Skip lines starting with "DEPRECATION WARNING:" (single-line only)
-        if RE_DEPRECATION.is_match(trimmed) {
+        if trimmed.starts_with("DEPRECATION WARNING:") {
             continue;
         }
 
@@ -200,10 +199,7 @@ fn filter_rspec_output(output: &str) -> String {
     match serde_json::from_str::<RspecOutput>(&stripped) {
         Ok(rspec) => return build_rspec_summary(&rspec),
         Err(e) => {
-            eprintln!(
-                "[rtk] rspec: JSON parse failed ({}), using text fallback",
-                e
-            );
+            eprintln!("[rtk] rspec: JSON parse failed ({e}), using text fallback");
         }
     }
 
@@ -226,7 +222,7 @@ fn build_rspec_summary(rspec: &RspecOutput) -> String {
 
     if s.failure_count == 0 && s.errors_outside_of_examples_count == 0 {
         let passed = s.example_count.saturating_sub(s.pending_count);
-        let mut result = format!("✓ RSpec: {} passed", passed);
+        let mut result = format!("✓ RSpec: {passed} passed");
         if s.pending_count > 0 {
             result.push_str(&format!(", {} pending", s.pending_count));
         }
@@ -375,9 +371,9 @@ fn filter_rspec_text(output: &str) -> String {
     // If we found a summary line, build result
     if !summary_line.is_empty() {
         if failures.is_empty() {
-            return format!("RSpec: {}", summary_line);
+            return format!("RSpec: {summary_line}");
         }
-        let mut result = format!("RSpec: {}\n", summary_line);
+        let mut result = format!("RSpec: {summary_line}\n");
         result.push_str("═══════════════════════════════════════\n\n");
         for (i, failure) in failures.iter().take(5).enumerate() {
             result.push_str(&format!("{}. ❌ {}\n", i + 1, failure));
@@ -395,7 +391,7 @@ fn filter_rspec_text(output: &str) -> String {
     for line in output.lines().rev() {
         let t = line.trim();
         if t.contains("example") && (t.contains("failure") || t.contains("pending")) {
-            return format!("RSpec: {}", t);
+            return format!("RSpec: {t}");
         }
     }
 
@@ -439,7 +435,6 @@ fn compact_failure_block(block: &str) -> String {
             spec_file = t.trim_start_matches("# ").to_string();
         } else if t.starts_with('#') && (t.contains("/gems/") || t.contains("lib/rspec")) {
             // Skip gem backtrace
-            continue;
         } else {
             kept_lines.push(t.to_string());
         }
@@ -447,7 +442,7 @@ fn compact_failure_block(block: &str) -> String {
 
     let mut result = kept_lines.join("\n   ");
     if !spec_file.is_empty() {
-        result.push_str(&format!("\n   {}", spec_file));
+        result.push_str(&format!("\n   {spec_file}"));
     }
     result
 }
@@ -672,14 +667,13 @@ mod tests {
         // Should NOT say "No examples found" — there was an error outside examples
         assert!(
             !result.contains("No examples found"),
-            "errors outside examples should not be treated as 'no examples': {}",
-            result
+            "errors outside examples should not be treated as 'no examples': {result}"
         );
     }
 
     #[test]
     fn test_filter_rspec_text_fallback() {
-        let text = r#"
+        let text = r"
 ..F.
 
 Failures:
@@ -690,7 +684,7 @@ Failures:
      # ./spec/models/user_spec.rb:5
 
 4 examples, 1 failure
-"#;
+";
         let result = filter_rspec_output(text);
         assert!(result.contains("RSpec:"));
         assert!(result.contains("4 examples, 1 failure"));
@@ -768,8 +762,7 @@ Failures:
         assert!(!result.contains("6. ❌"), "should not show sixth inline");
         assert!(
             result.contains("+1 more"),
-            "should show overflow count: {}",
-            result
+            "should show overflow count: {result}"
         );
     }
 
@@ -845,10 +838,7 @@ Failures:
 
         assert!(
             savings >= 60.0,
-            "RSpec all-pass: expected ≥60% savings, got {:.1}% (in={}, out={})",
-            savings,
-            input_tokens,
-            output_tokens
+            "RSpec all-pass: expected ≥60% savings, got {savings:.1}% (in={input_tokens}, out={output_tokens})"
         );
     }
 
@@ -863,10 +853,7 @@ Failures:
 
         assert!(
             savings >= 60.0,
-            "RSpec failures: expected ≥60% savings, got {:.1}% (in={}, out={})",
-            savings,
-            input_tokens,
-            output_tokens
+            "RSpec failures: expected ≥60% savings, got {savings:.1}% (in={input_tokens}, out={output_tokens})"
         );
     }
 
@@ -911,10 +898,7 @@ Coverage report generated for RSpec to /app/coverage.
 
         assert!(
             savings >= 30.0,
-            "RSpec text fallback: expected ≥30% savings, got {:.1}% (in={}, out={})",
-            savings,
-            input_tokens,
-            output_tokens
+            "RSpec text fallback: expected ≥30% savings, got {savings:.1}% (in={input_tokens}, out={output_tokens})"
         );
     }
 
@@ -932,7 +916,7 @@ Coverage report generated for RSpec to /app/coverage.
 
     #[test]
     fn test_filter_rspec_text_many_failures_caps_at_five() {
-        let text = r#"Randomized with seed 12345
+        let text = r"Randomized with seed 12345
 .......FFFFFFF
 
 Failures:
@@ -966,15 +950,14 @@ Failures:
      # ./spec/models/role_spec.rb:35
 
 14 examples, 7 failures
-"#;
+";
         let result = filter_rspec_text(text);
         assert!(result.contains("1. ❌"), "should show first failure");
         assert!(result.contains("5. ❌"), "should show fifth failure");
         assert!(!result.contains("6. ❌"), "should not show sixth inline");
         assert!(
             result.contains("+2 more"),
-            "should show overflow count: {}",
-            result
+            "should show overflow count: {result}"
         );
     }
 
@@ -984,24 +967,22 @@ Failures:
     fn test_filter_rspec_text_header_to_failed_examples() {
         // Input that has "Failed examples:" directly (no "Failures:" block),
         // followed by a summary line
-        let text = r#"..F..
+        let text = r"..F..
 
 Failed examples:
 
 rspec ./spec/models/user_spec.rb:5 # User is valid
 
 5 examples, 1 failure
-"#;
+";
         let result = filter_rspec_text(text);
         assert!(
             result.contains("5 examples, 1 failure"),
-            "should contain summary: {}",
-            result
+            "should contain summary: {result}"
         );
         assert!(
             result.contains("RSpec:"),
-            "should have RSpec prefix: {}",
-            result
+            "should have RSpec prefix: {result}"
         );
     }
 
@@ -1032,8 +1013,7 @@ rspec ./spec/models/user_spec.rb:5 # User is valid
             assert!(
                 args.iter()
                     .any(|a| a.starts_with("-f") && a.len() > 2 && !a.starts_with("--")),
-                "should detect {}",
-                flag
+                "should detect {flag}"
             );
         }
     }

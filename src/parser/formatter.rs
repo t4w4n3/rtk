@@ -1,5 +1,5 @@
 /// Token-efficient formatting trait for canonical types
-use super::types::*;
+use super::types::{BuildOutput, DependencyState, LintIssue, LintResult, LintSeverity, TestResult};
 
 /// Output formatting modes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,7 +57,7 @@ impl TokenFormatter for TestResult {
                     .take(2)
                     .collect::<Vec<_>>()
                     .join(" ");
-                lines.push(format!("   {}", error_preview));
+                lines.push(format!("   {error_preview}"));
             }
 
             if self.failures.len() > 5 {
@@ -66,7 +66,7 @@ impl TokenFormatter for TestResult {
         }
 
         if let Some(duration) = self.duration_ms {
-            lines.push(format!("\nTime: {}ms", duration));
+            lines.push(format!("\nTime: {duration}ms"));
         }
 
         lines.join("\n")
@@ -91,13 +91,13 @@ impl TokenFormatter for TestResult {
                 if let Some(stack) = &failure.stack_trace {
                     let stack_preview: String =
                         stack.lines().take(3).collect::<Vec<_>>().join("\n   ");
-                    lines.push(format!("   {}", stack_preview));
+                    lines.push(format!("   {stack_preview}"));
                 }
             }
         }
 
         if let Some(duration) = self.duration_ms {
-            lines.push(format!("\nDuration: {}ms", duration));
+            lines.push(format!("\nDuration: {duration}ms"));
         }
 
         lines.join("\n")
@@ -232,14 +232,14 @@ impl TokenFormatter for DependencyState {
             for dep in &self.dependencies {
                 if let Some(latest) = &dep.latest_version {
                     if &dep.current_version != latest {
-                        let dev_marker = if dep.dev_dependency { " (dev)" } else { "" };
+                        let dev_marker = if dep.is_dev { " (dev)" } else { "" };
                         lines.push(format!(
                             "  {}: {} → {}{}",
                             dep.name, dep.current_version, latest, dev_marker
                         ));
                         if let Some(wanted) = &dep.wanted_version {
                             if wanted != latest {
-                                lines.push(format!("    (wanted: {})", wanted));
+                                lines.push(format!("    (wanted: {wanted})"));
                             }
                         }
                     }
@@ -277,7 +277,7 @@ impl TokenFormatter for BuildOutput {
         }
 
         if let Some(duration) = self.duration_ms {
-            lines.push(format!("Time: {}ms", duration));
+            lines.push(format!("Time: {duration}ms"));
         }
 
         lines.join("\n")
@@ -317,7 +317,7 @@ impl TokenFormatter for BuildOutput {
         }
 
         if let Some(duration) = self.duration_ms {
-            lines.push(format!("\nDuration: {}ms", duration));
+            lines.push(format!("\nDuration: {duration}ms"));
         }
 
         lines.join("\n")

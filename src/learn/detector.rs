@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use regex::Regex;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ErrorType {
     UnknownFlag,
     CommandNotFound,
@@ -441,7 +441,7 @@ mod tests {
         assert_eq!(command_similarity("git status", "npm install"), 0.0);
         let sim = command_similarity("git commit --amend", "git commit --ammend");
         // Debug: check what similarity actually is
-        println!("Similarity: {}", sim);
+        println!("Similarity: {sim}");
         // Same base (0.5) + both have 1 arg, 0 intersection = 0.5 + 0 = 0.5
         assert_eq!(sim, 0.5);
     }

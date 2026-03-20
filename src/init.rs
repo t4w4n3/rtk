@@ -51,7 +51,7 @@ schema_version = 1
 "#;
 
 /// Control flow for settings.json patching
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PatchMode {
     Ask,  // Default: prompt user [y/N]
     Auto, // --auto-patch: no prompt
@@ -59,7 +59,7 @@ pub enum PatchMode {
 }
 
 /// Result of settings.json patching operation
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PatchResult {
     Patched,        // Hook was added successfully
     AlreadyPresent, // Hook was already in settings.json
@@ -68,7 +68,7 @@ pub enum PatchResult {
 }
 
 // Legacy full instructions for backward compatibility (--claude-md mode)
-const RTK_INSTRUCTIONS: &str = r##"<!-- rtk-instructions v2 -->
+const RTK_INSTRUCTIONS: &str = r#"<!-- rtk-instructions v2 -->
 # RTK (Rust Token Killer) - Token-Optimized Commands
 
 ## Golden Rule
@@ -201,7 +201,7 @@ rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
 
 Overall average: **60-90% token reduction** on common development operations.
 <!-- /rtk-instructions -->
-"##;
+"#;
 
 /// Main entry point for `rtk init`
 #[allow(clippy::too_many_arguments)]
@@ -527,14 +527,14 @@ pub fn uninstall(global: bool, gemini: bool, codex: bool, cursor: bool, verbose:
         }
         let cursor_removed =
             remove_cursor_hooks(verbose).context("Failed to remove Cursor hooks")?;
-        if !cursor_removed.is_empty() {
+        if cursor_removed.is_empty() {
+            println!("RTK Cursor support was not installed (nothing to remove)");
+        } else {
             println!("RTK uninstalled (Cursor):");
             for item in &cursor_removed {
-                println!("  - {}", item);
+                println!("  - {item}");
             }
             println!("\nRestart Cursor to apply changes.");
-        } else {
-            println!("RTK Cursor support was not installed (nothing to remove)");
         }
         return Ok(());
     }
@@ -550,14 +550,14 @@ pub fn uninstall(global: bool, gemini: bool, codex: bool, cursor: bool, verbose:
     if gemini {
         let gemini_removed = uninstall_gemini(verbose)?;
         removed.extend(gemini_removed);
-        if !removed.is_empty() {
+        if removed.is_empty() {
+            println!("RTK Gemini support was not installed (nothing to remove)");
+        } else {
             println!("RTK uninstalled (Gemini):");
             for item in &removed {
-                println!("  - {}", item);
+                println!("  - {item}");
             }
             println!("\nRestart Gemini CLI to apply changes.");
-        } else {
-            println!("RTK Gemini support was not installed (nothing to remove)");
         }
         return Ok(());
     }
@@ -627,7 +627,7 @@ pub fn uninstall(global: bool, gemini: bool, codex: bool, cursor: bool, verbose:
     } else {
         println!("RTK uninstalled:");
         for item in removed {
-            println!("  - {}", item);
+            println!("  - {item}");
         }
         println!("\nRestart Claude Code, OpenCode, and Cursor (if used) to apply changes.");
     }
@@ -650,7 +650,7 @@ fn uninstall_codex(global: bool, verbose: u8) -> Result<()> {
     } else {
         println!("RTK uninstalled for Codex CLI:");
         for item in removed {
-            println!("  - {}", item);
+            println!("  - {item}");
         }
     }
 
@@ -800,13 +800,12 @@ fn clean_double_blanks(content: &str) -> String {
 /// Creates hooks.PreToolUse structure if missing, preserves existing hooks
 fn insert_hook_entry(root: &mut serde_json::Value, hook_command: &str) {
     // Ensure root is an object
-    let root_obj = match root.as_object_mut() {
-        Some(obj) => obj,
-        None => {
-            *root = serde_json::json!({});
-            root.as_object_mut()
-                .expect("Just created object, must succeed")
-        }
+    let root_obj = if let Some(obj) = root.as_object_mut() {
+        obj
+    } else {
+        *root = serde_json::json!({});
+        root.as_object_mut()
+            .expect("Just created object, must succeed")
     };
 
     // Use entry() API for idiomatic insertion
@@ -912,7 +911,7 @@ fn run_default_mode(
     } else {
         "already up to date"
     };
-    println!("\nRTK hook {} (global).\n", hook_status);
+    println!("\nRTK hook {hook_status} (global).\n");
     println!("  Hook:      {}", hook_path.display());
     println!("  RTK.md:    {} (10 lines)", rtk_md_path.display());
     if let Some(path) = &opencode_plugin_path {
@@ -930,9 +929,6 @@ fn run_default_mode(
 
     // Report result
     match patch_result {
-        PatchResult::Patched => {
-            // Already printed by patch_settings_json
-        }
         PatchResult::AlreadyPresent => {
             println!("\n  settings.json: hook already present");
             if install_opencode {
@@ -941,8 +937,8 @@ fn run_default_mode(
                 println!("  Restart Claude Code. Test with: git status");
             }
         }
-        PatchResult::Declined | PatchResult::Skipped => {
-            // Manual instructions already printed by patch_settings_json
+        PatchResult::Patched | PatchResult::Declined | PatchResult::Skipped => {
+            // Already printed by patch_settings_json or manual instructions
         }
     }
 
@@ -1044,7 +1040,7 @@ fn run_hook_only_mode(
     } else {
         "already up to date"
     };
-    println!("\nRTK hook {} (hook-only mode).\n", hook_status);
+    println!("\nRTK hook {hook_status} (hook-only mode).\n");
     println!("  Hook: {}", hook_path.display());
     if let Some(path) = &opencode_plugin_path {
         println!("  OpenCode: {}", path.display());
@@ -1058,9 +1054,6 @@ fn run_hook_only_mode(
 
     // Report result
     match patch_result {
-        PatchResult::Patched => {
-            // Already printed by patch_settings_json
-        }
         PatchResult::AlreadyPresent => {
             println!("\n  settings.json: hook already present");
             if install_opencode {
@@ -1069,8 +1062,8 @@ fn run_hook_only_mode(
                 println!("  Restart Claude Code. Test with: git status");
             }
         }
-        PatchResult::Declined | PatchResult::Skipped => {
-            // Manual instructions already printed by patch_settings_json
+        PatchResult::Patched | PatchResult::Declined | PatchResult::Skipped => {
+            // Already printed by patch_settings_json or manual instructions
         }
     }
 
@@ -1478,7 +1471,7 @@ fn remove_rtk_block(content: &str) -> (String, bool) {
         let result = if after.is_empty() {
             before.to_string()
         } else {
-            format!("{}\n\n{}", before, after)
+            format!("{before}\n\n{after}")
         };
 
         (result, true) // migrated
@@ -1613,7 +1606,7 @@ fn install_cursor_hooks(verbose: u8) -> Result<()> {
     } else {
         "already up to date"
     };
-    println!("\nCursor hook {} (global).\n", hook_status);
+    println!("\nCursor hook {hook_status} (global).\n");
     println!("  Hook:       {}", hook_path.display());
     println!("  hooks.json: {}", hooks_json_path.display());
 
@@ -1694,13 +1687,12 @@ fn cursor_hook_already_present(root: &serde_json::Value) -> bool {
 
 /// Insert RTK preToolUse entry into Cursor hooks.json
 fn insert_cursor_hook_entry(root: &mut serde_json::Value) {
-    let root_obj = match root.as_object_mut() {
-        Some(obj) => obj,
-        None => {
-            *root = serde_json::json!({ "version": 1 });
-            root.as_object_mut()
-                .expect("Just created object, must succeed")
-        }
+    let root_obj = if let Some(obj) = root.as_object_mut() {
+        obj
+    } else {
+        *root = serde_json::json!({ "version": 1 });
+        root.as_object_mut()
+            .expect("Just created object, must succeed")
     };
 
     // Ensure version key
@@ -1875,8 +1867,7 @@ fn show_claude_config() -> Result<()> {
         Ok(integrity::IntegrityStatus::NoBaseline) => {
             println!("[warn] Integrity: no baseline hash (run: rtk init -g to establish)");
         }
-        Ok(integrity::IntegrityStatus::NotInstalled)
-        | Ok(integrity::IntegrityStatus::OrphanedHash) => {
+        Ok(integrity::IntegrityStatus::NotInstalled | integrity::IntegrityStatus::OrphanedHash) => {
             // Don't show integrity line if hook isn't installed
         }
         Err(_) => {
@@ -1916,20 +1907,18 @@ fn show_claude_config() -> Result<()> {
     let settings_path = claude_dir.join("settings.json");
     if settings_path.exists() {
         let content = fs::read_to_string(&settings_path)?;
-        if !content.trim().is_empty() {
-            if let Ok(root) = serde_json::from_str::<serde_json::Value>(&content) {
-                let hook_command = hook_path.display().to_string();
-                if hook_already_present(&root, &hook_command) {
-                    println!("[ok] settings.json: RTK hook configured");
-                } else {
-                    println!("[warn] settings.json: exists but RTK hook not configured");
-                    println!("    Run: rtk init -g --auto-patch");
-                }
+        if content.trim().is_empty() {
+            println!("[--] settings.json: empty");
+        } else if let Ok(root) = serde_json::from_str::<serde_json::Value>(&content) {
+            let hook_command = hook_path.display().to_string();
+            if hook_already_present(&root, &hook_command) {
+                println!("[ok] settings.json: RTK hook configured");
             } else {
-                println!("[warn] settings.json: exists but invalid JSON");
+                println!("[warn] settings.json: exists but RTK hook not configured");
+                println!("    Run: rtk init -g --auto-patch");
             }
         } else {
-            println!("[--] settings.json: empty");
+            println!("[warn] settings.json: exists but invalid JSON");
         }
     } else {
         println!("[--] settings.json: not found");
@@ -1989,19 +1978,17 @@ fn show_claude_config() -> Result<()> {
 
         if cursor_hooks_json.exists() {
             let content = fs::read_to_string(&cursor_hooks_json)?;
-            if !content.trim().is_empty() {
-                if let Ok(root) = serde_json::from_str::<serde_json::Value>(&content) {
-                    if cursor_hook_already_present(&root) {
-                        println!("[ok] Cursor hooks.json: RTK preToolUse configured");
-                    } else {
-                        println!("[warn] Cursor hooks.json: exists but RTK not configured");
-                        println!("    Run: rtk init -g --agent cursor");
-                    }
+            if content.trim().is_empty() {
+                println!("[--] Cursor hooks.json: empty");
+            } else if let Ok(root) = serde_json::from_str::<serde_json::Value>(&content) {
+                if cursor_hook_already_present(&root) {
+                    println!("[ok] Cursor hooks.json: RTK preToolUse configured");
                 } else {
-                    println!("[warn] Cursor hooks.json: exists but invalid JSON");
+                    println!("[warn] Cursor hooks.json: exists but RTK not configured");
+                    println!("    Run: rtk init -g --agent cursor");
                 }
             } else {
-                println!("[--] Cursor hooks.json: empty");
+                println!("[warn] Cursor hooks.json: exists but invalid JSON");
             }
         } else {
             println!("[--] Cursor hooks.json: not found");
@@ -2093,9 +2080,9 @@ fn run_opencode_only_mode(verbose: u8) -> Result<()> {
 // ─── Gemini CLI support ───────────────────────────────────────────
 
 /// Gemini hook wrapper script — delegates to `rtk hook gemini`
-const GEMINI_HOOK_SCRIPT: &str = r#"#!/bin/bash
+const GEMINI_HOOK_SCRIPT: &str = r"#!/bin/bash
 exec rtk hook gemini
-"#;
+";
 
 /// Resolve the Gemini config directory (~/.gemini)
 fn resolve_gemini_dir() -> Result<PathBuf> {
@@ -2357,13 +2344,13 @@ mod tests {
 
     #[test]
     fn test_migration_removes_old_block() {
-        let input = r#"# My Config
+        let input = r"# My Config
 
 <!-- rtk-instructions v2 -->
 OLD RTK STUFF
 <!-- /rtk-instructions -->
 
-More content"#;
+More content";
 
         let (result, migrated) = remove_rtk_block(input);
         assert!(migrated);
@@ -2456,14 +2443,14 @@ More content"#;
 
     #[test]
     fn test_upsert_rtk_block_updates_stale_block() {
-        let input = r#"# Team instructions
+        let input = r"# Team instructions
 
 <!-- rtk-instructions v1 -->
 OLD RTK CONTENT
 <!-- /rtk-instructions -->
 
 More notes
-"#;
+";
 
         let (content, action) = upsert_rtk_block(input, RTK_INSTRUCTIONS);
         assert_eq!(action, RtkBlockUpsert::Updated);
@@ -2475,10 +2462,7 @@ More notes
 
     #[test]
     fn test_upsert_rtk_block_noop_when_already_current() {
-        let input = format!(
-            "# Team instructions\n\n{}\n\nMore notes\n",
-            RTK_INSTRUCTIONS
-        );
+        let input = format!("# Team instructions\n\n{RTK_INSTRUCTIONS}\n\nMore notes\n");
         let (content, action) = upsert_rtk_block(&input, RTK_INSTRUCTIONS);
         assert_eq!(action, RtkBlockUpsert::Unchanged);
         assert_eq!(content, input);
@@ -2785,9 +2769,9 @@ More notes
         let serialized = serde_json::to_string(&parsed).unwrap();
 
         // Keys should appear in same order
-        let _original_keys: Vec<&str> = original.split("\"").filter(|s| s.contains(":")).collect();
+        let _original_keys: Vec<&str> = original.split('"').filter(|s| s.contains(':')).collect();
         let _serialized_keys: Vec<&str> =
-            serialized.split("\"").filter(|s| s.contains(":")).collect();
+            serialized.split('"').filter(|s| s.contains(':')).collect();
 
         // Just check that keys exist (preserve_order doesn't guarantee exact order in nested objects)
         assert!(serialized.contains("\"env\""));

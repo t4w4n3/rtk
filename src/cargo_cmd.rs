@@ -86,22 +86,21 @@ where
 
     let output = cmd
         .output()
-        .with_context(|| format!("Failed to run cargo {}", subcommand))?;
+        .with_context(|| format!("Failed to run cargo {subcommand}"))?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let raw = format!("{}\n{}", stdout, stderr);
+    let raw = format!("{stdout}\n{stderr}");
 
     let exit_code = output
         .status
         .code()
-        .unwrap_or(if output.status.success() { 0 } else { 1 });
+        .unwrap_or_else(|| i32::from(!output.status.success()));
     let filtered = filter_fn(&raw);
 
-    if let Some(hint) = crate::tee::tee_and_hint(&raw, &format!("cargo_{}", subcommand), exit_code)
-    {
-        println!("{}\n{}", filtered, hint);
+    if let Some(hint) = crate::tee::tee_and_hint(&raw, &format!("cargo_{subcommand}"), exit_code) {
+        println!("{filtered}\n{hint}");
     } else {
-        println!("{}", filtered);
+        println!("{filtered}");
     }
 
     timer.track(
@@ -149,7 +148,7 @@ fn format_crate_info(name: &str, version: &str, fallback: &str) -> String {
     } else if version.is_empty() {
         name.to_string()
     } else {
-        format!("{} {}", name, version)
+        format!("{name} {version}")
     }
 }
 
@@ -264,14 +263,14 @@ fn filter_cargo_install(output: &str) -> String {
     // Already installed / up to date
     if already_installed {
         let info = ignored_line.split('`').nth(1).unwrap_or(&ignored_line);
-        return format!("cargo install: {} already installed", info);
+        return format!("cargo install: {info} already installed");
     }
 
     // Errors
     if error_count > 0 {
         let crate_info = format_crate_info(&installed_crate, &installed_version, "");
         let deps_info = if compiled > 0 {
-            format!(", {} deps compiled", compiled)
+            format!(", {compiled} deps compiled")
         } else {
             String::new()
         };
@@ -313,10 +312,10 @@ fn filter_cargo_install(output: &str) -> String {
     // Success
     let crate_info = format_crate_info(&installed_crate, &installed_version, "package");
 
-    let mut result = format!("cargo install ({}, {} deps compiled)", crate_info, compiled);
+    let mut result = format!("cargo install ({crate_info}, {compiled} deps compiled)");
 
     for line in &replaced_lines {
-        result.push_str(&format!("\n  {}", line));
+        result.push_str(&format!("\n  {line}"));
     }
 
     result
@@ -480,24 +479,22 @@ fn filter_cargo_nextest(output: &str) -> String {
             .and_then(|m| m.as_str().parse().ok())
             .unwrap_or(0);
 
-        let binary_text = if binaries == 1 {
-            "1 binary".to_string()
-        } else if binaries > 1 {
-            format!("{} binaries", binaries)
-        } else {
-            String::new()
+        let binary_text = match binaries.cmp(&1) {
+            std::cmp::Ordering::Equal => "1 binary".to_string(),
+            std::cmp::Ordering::Greater => format!("{binaries} binaries"),
+            std::cmp::Ordering::Less => String::new(),
         };
 
         if failed == 0 {
             // All pass - compact single line
             let mut parts = vec![format!("{} passed", passed)];
             if skipped > 0 {
-                parts.push(format!("{} skipped", skipped));
+                parts.push(format!("{skipped} skipped"));
             }
             let meta = if binary_text.is_empty() {
-                format!("{}s", duration)
+                format!("{duration}s")
             } else {
-                format!("{}, {}s", binary_text, duration)
+                format!("{binary_text}, {duration}s")
             };
             return format!("cargo nextest: {} ({})", parts.join(", "), meta);
         }
@@ -516,15 +513,15 @@ fn filter_cargo_nextest(output: &str) -> String {
 
         let mut summary_parts = vec![format!("{} passed", passed)];
         if failed > 0 {
-            summary_parts.push(format!("{} failed", failed));
+            summary_parts.push(format!("{failed} failed"));
         }
         if skipped > 0 {
-            summary_parts.push(format!("{} skipped", skipped));
+            summary_parts.push(format!("{skipped} skipped"));
         }
         let meta = if binary_text.is_empty() {
-            format!("{}s", duration)
+            format!("{duration}s")
         } else {
-            format!("{}, {}s", binary_text, duration)
+            format!("{binary_text}, {duration}s")
         };
         result.push_str(&format!(
             "cargo nextest: {} ({})",
@@ -596,8 +593,7 @@ fn filter_cargo_build(output: &str) -> String {
             && line.contains("generated")
             && line.contains("warning")
         {
-            // "warning: `crate` generated N warnings" summary line
-            continue;
+            // "warning: `crate` generated N warnings" summary line — skip
         } else if line.starts_with("warning:") || line.starts_with("warning[") {
             if in_error && !current_error.is_empty() {
                 errors.push(current_error.join("\n"));
@@ -622,13 +618,12 @@ fn filter_cargo_build(output: &str) -> String {
     }
 
     if error_count == 0 && warnings == 0 {
-        return format!("cargo build ({} crates compiled)", compiled);
+        return format!("cargo build ({compiled} crates compiled)");
     }
 
     let mut result = String::new();
     result.push_str(&format!(
-        "cargo build: {} errors, {} warnings ({} crates)\n",
-        error_count, warnings, compiled
+        "cargo build: {error_count} errors, {warnings} warnings ({compiled} crates)\n"
     ));
     result.push_str("═══════════════════════════════════════\n");
 
@@ -740,7 +735,7 @@ impl AggregatedTestResult {
                 counts, suite_text, self.duration_secs
             )
         } else {
-            format!("cargo test: {} ({})", counts, suite_text)
+            format!("cargo test: {counts} ({suite_text})")
         }
     }
 }
@@ -828,7 +823,7 @@ fn filter_cargo_test(output: &str) -> String {
 
         // Fallback: use original behavior if regex failed
         for line in &summary_lines {
-            result.push_str(&format!("{}\n", line));
+            result.push_str(&format!("{line}\n"));
         }
         return result.trim().to_string();
     }
@@ -846,7 +841,7 @@ fn filter_cargo_test(output: &str) -> String {
     }
 
     for line in &summary_lines {
-        result.push_str(&format!("{}\n", line));
+        result.push_str(&format!("{line}\n"));
     }
 
     if result.trim().is_empty() {
@@ -868,7 +863,7 @@ fn filter_cargo_test(output: &str) -> String {
             .filter(|l| !l.trim().is_empty() && !l.trim_start().starts_with("Compiling"))
             .collect();
         for line in meaningful.iter().rev().take(5).rev() {
-            result.push_str(&format!("{}\n", line));
+            result.push_str(&format!("{line}\n"));
         }
     }
 
@@ -945,8 +940,7 @@ fn filter_cargo_clippy(output: &str) -> String {
 
     let mut result = String::new();
     result.push_str(&format!(
-        "cargo clippy: {} errors, {} warnings\n",
-        error_count, warning_count
+        "cargo clippy: {error_count} errors, {warning_count} warnings\n"
     ));
     result.push_str("═══════════════════════════════════════\n");
 
@@ -957,7 +951,7 @@ fn filter_cargo_clippy(output: &str) -> String {
     for (rule, locations) in rule_counts.iter().take(15) {
         result.push_str(&format!("  {} ({}x)\n", rule, locations.len()));
         for loc in locations.iter().take(3) {
-            result.push_str(&format!("    {}\n", loc));
+            result.push_str(&format!("    {loc}\n"));
         }
         if locations.len() > 3 {
             result.push_str(&format!("    ... +{} more\n", locations.len() - 3));
@@ -976,7 +970,7 @@ pub fn run_passthrough(args: &[OsString], verbose: u8) -> Result<()> {
     let timer = tracking::TimedExecution::start();
 
     if verbose > 0 {
-        eprintln!("cargo passthrough: {:?}", args);
+        eprintln!("cargo passthrough: {args:?}");
     }
     let status = resolved_command("cargo")
         .args(args)
@@ -985,8 +979,8 @@ pub fn run_passthrough(args: &[OsString], verbose: u8) -> Result<()> {
 
     let args_str = tracking::args_display(args);
     timer.track_passthrough(
-        &format!("cargo {}", args_str),
-        &format!("rtk cargo {} (passthrough)", args_str),
+        &format!("cargo {args_str}"),
+        &format!("rtk cargo {args_str} (passthrough)"),
     );
 
     if !status.success() {
@@ -1106,11 +1100,11 @@ mod tests {
 
     #[test]
     fn test_filter_cargo_build_success() {
-        let output = r#"   Compiling libc v0.2.153
+        let output = r"   Compiling libc v0.2.153
    Compiling cfg-if v1.0.0
    Compiling rtk v0.5.0
     Finished dev [unoptimized + debuginfo] target(s) in 15.23s
-"#;
+";
         let result = filter_cargo_build(output);
         assert!(result.contains("cargo build"));
         assert!(result.contains("3 crates compiled"));
@@ -1135,7 +1129,7 @@ error: aborting due to 1 previous error
 
     #[test]
     fn test_filter_cargo_test_all_pass() {
-        let output = r#"   Compiling rtk v0.5.0
+        let output = r"   Compiling rtk v0.5.0
     Finished test [unoptimized + debuginfo] target(s) in 2.53s
      Running target/debug/deps/rtk-abc123
 
@@ -1145,12 +1139,11 @@ test utils::tests::test_truncate_long_string ... ok
 test utils::tests::test_strip_ansi_simple ... ok
 
 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-"#;
+";
         let result = filter_cargo_test(output);
         assert!(
             result.contains("cargo test: 15 passed (1 suite, 0.01s)"),
-            "Expected compact format, got: {}",
-            result
+            "Expected compact format, got: {result}"
         );
         assert!(!result.contains("Compiling"));
         assert!(!result.contains("test utils"));
@@ -1158,7 +1151,7 @@ test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 
     #[test]
     fn test_filter_cargo_test_failures() {
-        let output = r#"running 5 tests
+        let output = r"running 5 tests
 test foo::test_a ... ok
 test foo::test_b ... FAILED
 test foo::test_c ... ok
@@ -1172,7 +1165,7 @@ failures:
     foo::test_b
 
 test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
-"#;
+";
         let result = filter_cargo_test(output);
         assert!(result.contains("FAILURES"));
         assert!(result.contains("test_b"));
@@ -1181,7 +1174,7 @@ test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 
     #[test]
     fn test_filter_cargo_test_multi_suite_all_pass() {
-        let output = r#"   Compiling rtk v0.5.0
+        let output = r"   Compiling rtk v0.5.0
     Finished test [unoptimized + debuginfo] target(s) in 2.53s
      Running unittests src/lib.rs (target/debug/deps/rtk-abc123)
 
@@ -1202,19 +1195,18 @@ test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
 
 running 32 tests
 test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
-"#;
+";
         let result = filter_cargo_test(output);
         assert!(
             result.contains("cargo test: 137 passed (4 suites, 1.45s)"),
-            "Expected aggregated format, got: {}",
-            result
+            "Expected aggregated format, got: {result}"
         );
         assert!(!result.contains("running"));
     }
 
     #[test]
     fn test_filter_cargo_test_multi_suite_with_failures() {
-        let output = r#"     Running unittests src/lib.rs
+        let output = r"     Running unittests src/lib.rs
 
 running 20 tests
 test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
@@ -1235,21 +1227,21 @@ test result: FAILED. 14 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out;
 
 running 10 tests
 test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
-"#;
+";
         let result = filter_cargo_test(output);
         // Should NOT aggregate when there are failures
-        assert!(result.contains("FAILURES"), "got: {}", result);
-        assert!(result.contains("test_bad"), "got: {}", result);
-        assert!(result.contains("test result:"), "got: {}", result);
+        assert!(result.contains("FAILURES"), "got: {result}");
+        assert!(result.contains("test_bad"), "got: {result}");
+        assert!(result.contains("test result:"), "got: {result}");
         // Should show individual summaries
-        assert!(result.contains("20 passed"), "got: {}", result);
-        assert!(result.contains("14 passed"), "got: {}", result);
-        assert!(result.contains("10 passed"), "got: {}", result);
+        assert!(result.contains("20 passed"), "got: {result}");
+        assert!(result.contains("14 passed"), "got: {result}");
+        assert!(result.contains("10 passed"), "got: {result}");
     }
 
     #[test]
     fn test_filter_cargo_test_all_suites_zero_tests() {
-        let output = r#"     Running unittests src/empty1.rs
+        let output = r"     Running unittests src/empty1.rs
 
 running 0 tests
 
@@ -1266,18 +1258,17 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 running 0 tests
 
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-"#;
+";
         let result = filter_cargo_test(output);
         assert!(
             result.contains("cargo test: 0 passed (3 suites, 0.00s)"),
-            "Expected compact format for zero tests, got: {}",
-            result
+            "Expected compact format for zero tests, got: {result}"
         );
     }
 
     #[test]
     fn test_filter_cargo_test_with_ignored_and_filtered() {
-        let output = r#"     Running unittests src/lib.rs
+        let output = r"     Running unittests src/lib.rs
 
 running 50 tests
 test result: ok. 45 passed; 0 failed; 3 ignored; 0 measured; 2 filtered out; finished in 0.50s
@@ -1286,43 +1277,40 @@ test result: ok. 45 passed; 0 failed; 3 ignored; 0 measured; 2 filtered out; fin
 
 running 20 tests
 test result: ok. 18 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.20s
-"#;
+";
         let result = filter_cargo_test(output);
         assert!(
             result.contains("cargo test: 63 passed, 5 ignored, 2 filtered out (2 suites, 0.70s)"),
-            "Expected compact format with ignored and filtered, got: {}",
-            result
+            "Expected compact format with ignored and filtered, got: {result}"
         );
     }
 
     #[test]
     fn test_filter_cargo_test_single_suite_compact() {
-        let output = r#"     Running unittests src/main.rs
+        let output = r"     Running unittests src/main.rs
 
 running 15 tests
 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
-"#;
+";
         let result = filter_cargo_test(output);
         assert!(
             result.contains("cargo test: 15 passed (1 suite, 0.01s)"),
-            "Expected singular 'suite', got: {}",
-            result
+            "Expected singular 'suite', got: {result}"
         );
     }
 
     #[test]
     fn test_filter_cargo_test_regex_fallback() {
-        let output = r#"     Running unittests src/main.rs
+        let output = r"     Running unittests src/main.rs
 
 running 15 tests
 test result: MALFORMED LINE WITHOUT PROPER FORMAT
-"#;
+";
         let result = filter_cargo_test(output);
         // Should fallback to original behavior (show line without checkmark)
         assert!(
             result.contains("test result: MALFORMED"),
-            "Expected fallback format, got: {}",
-            result
+            "Expected fallback format, got: {result}"
         );
     }
 
@@ -1351,16 +1339,16 @@ error: could not compile `rtk` (test "repro_compile_fail") due to 1 previous err
 
     #[test]
     fn test_filter_cargo_clippy_clean() {
-        let output = r#"    Checking rtk v0.5.0
+        let output = r"    Checking rtk v0.5.0
     Finished dev [unoptimized + debuginfo] target(s) in 1.53s
-"#;
+";
         let result = filter_cargo_clippy(output);
         assert!(result.contains("cargo clippy: No issues found"));
     }
 
     #[test]
     fn test_filter_cargo_clippy_warnings() {
-        let output = r#"    Checking rtk v0.5.0
+        let output = r"    Checking rtk v0.5.0
 warning: unused variable: `x` [unused_variables]
  --> src/main.rs:10:9
   |
@@ -1375,7 +1363,7 @@ warning: this function has too many arguments [clippy::too_many_arguments]
 
 warning: `rtk` (bin) generated 2 warnings
     Finished dev [unoptimized + debuginfo] target(s) in 1.53s
-"#;
+";
         let result = filter_cargo_clippy(output);
         assert!(result.contains("0 errors, 2 warnings"));
         assert!(result.contains("unused_variables"));
@@ -1384,7 +1372,7 @@ warning: `rtk` (bin) generated 2 warnings
 
     #[test]
     fn test_filter_cargo_install_success() {
-        let output = r#"  Installing rtk v0.11.0
+        let output = r"  Installing rtk v0.11.0
   Downloading crates ...
   Downloaded anyhow v1.0.80
   Downloaded clap v4.5.0
@@ -1396,28 +1384,28 @@ warning: `rtk` (bin) generated 2 warnings
     Finished `release` profile [optimized] target(s) in 45.23s
   Replacing /Users/user/.cargo/bin/rtk
    Replaced package `rtk v0.9.4` with `rtk v0.11.0` (/Users/user/.cargo/bin/rtk)
-"#;
+";
         let result = filter_cargo_install(output);
-        assert!(result.contains("cargo install"), "got: {}", result);
-        assert!(result.contains("rtk v0.11.0"), "got: {}", result);
-        assert!(result.contains("5 deps compiled"), "got: {}", result);
-        assert!(result.contains("Replaced"), "got: {}", result);
-        assert!(!result.contains("Compiling"), "got: {}", result);
-        assert!(!result.contains("Downloading"), "got: {}", result);
+        assert!(result.contains("cargo install"), "got: {result}");
+        assert!(result.contains("rtk v0.11.0"), "got: {result}");
+        assert!(result.contains("5 deps compiled"), "got: {result}");
+        assert!(result.contains("Replaced"), "got: {result}");
+        assert!(!result.contains("Compiling"), "got: {result}");
+        assert!(!result.contains("Downloading"), "got: {result}");
     }
 
     #[test]
     fn test_filter_cargo_install_replace() {
-        let output = r#"  Installing rtk v0.11.0
+        let output = r"  Installing rtk v0.11.0
    Compiling rtk v0.11.0
     Finished `release` profile [optimized] target(s) in 10.0s
   Replacing /Users/user/.cargo/bin/rtk
    Replaced package `rtk v0.9.4` with `rtk v0.11.0` (/Users/user/.cargo/bin/rtk)
-"#;
+";
         let result = filter_cargo_install(output);
-        assert!(result.contains("cargo install"), "got: {}", result);
-        assert!(result.contains("Replacing"), "got: {}", result);
-        assert!(result.contains("Replaced"), "got: {}", result);
+        assert!(result.contains("cargo install"), "got: {result}");
+        assert!(result.contains("Replacing"), "got: {result}");
+        assert!(result.contains("Replaced"), "got: {result}");
     }
 
     #[test]
@@ -1433,54 +1421,53 @@ error[E0308]: mismatched types
 error: aborting due to 1 previous error
 "#;
         let result = filter_cargo_install(output);
-        assert!(result.contains("cargo install: 1 error"), "got: {}", result);
-        assert!(result.contains("E0308"), "got: {}", result);
-        assert!(result.contains("mismatched types"), "got: {}", result);
-        assert!(!result.contains("aborting"), "got: {}", result);
+        assert!(result.contains("cargo install: 1 error"), "got: {result}");
+        assert!(result.contains("E0308"), "got: {result}");
+        assert!(result.contains("mismatched types"), "got: {result}");
+        assert!(!result.contains("aborting"), "got: {result}");
     }
 
     #[test]
     fn test_filter_cargo_install_already_installed() {
-        let output = r#"  Ignored package `rtk v0.11.0`, is already installed
-"#;
+        let output = r"  Ignored package `rtk v0.11.0`, is already installed
+";
         let result = filter_cargo_install(output);
-        assert!(result.contains("already installed"), "got: {}", result);
-        assert!(result.contains("rtk v0.11.0"), "got: {}", result);
+        assert!(result.contains("already installed"), "got: {result}");
+        assert!(result.contains("rtk v0.11.0"), "got: {result}");
     }
 
     #[test]
     fn test_filter_cargo_install_up_to_date() {
-        let output = r#"  Ignored package `cargo-deb v2.1.0 (/Users/user/cargo-deb)`, is already installed
-"#;
+        let output = r"  Ignored package `cargo-deb v2.1.0 (/Users/user/cargo-deb)`, is already installed
+";
         let result = filter_cargo_install(output);
-        assert!(result.contains("already installed"), "got: {}", result);
-        assert!(result.contains("cargo-deb v2.1.0"), "got: {}", result);
+        assert!(result.contains("already installed"), "got: {result}");
+        assert!(result.contains("cargo-deb v2.1.0"), "got: {result}");
     }
 
     #[test]
     fn test_filter_cargo_install_empty_output() {
         let result = filter_cargo_install("");
-        assert!(result.contains("cargo install"), "got: {}", result);
-        assert!(result.contains("0 deps compiled"), "got: {}", result);
+        assert!(result.contains("cargo install"), "got: {result}");
+        assert!(result.contains("0 deps compiled"), "got: {result}");
     }
 
     #[test]
     fn test_filter_cargo_install_path_warning() {
-        let output = r#"  Installing rtk v0.11.0
+        let output = r"  Installing rtk v0.11.0
    Compiling rtk v0.11.0
     Finished `release` profile [optimized] target(s) in 10.0s
   Replacing /Users/user/.cargo/bin/rtk
    Replaced package `rtk v0.9.4` with `rtk v0.11.0` (/Users/user/.cargo/bin/rtk)
 warning: be sure to add `/Users/user/.cargo/bin` to your PATH
-"#;
+";
         let result = filter_cargo_install(output);
-        assert!(result.contains("cargo install"), "got: {}", result);
+        assert!(result.contains("cargo install"), "got: {result}");
         assert!(
             result.contains("be sure to add"),
-            "PATH warning should be kept: {}",
-            result
+            "PATH warning should be kept: {result}"
         );
-        assert!(result.contains("Replaced"), "got: {}", result);
+        assert!(result.contains("Replaced"), "got: {result}");
     }
 
     #[test]
@@ -1504,17 +1491,16 @@ error: aborting due to 2 previous errors
         let result = filter_cargo_install(output);
         assert!(
             result.contains("2 errors"),
-            "should show 2 errors: {}",
-            result
+            "should show 2 errors: {result}"
         );
-        assert!(result.contains("E0308"), "got: {}", result);
-        assert!(result.contains("E0425"), "got: {}", result);
-        assert!(!result.contains("aborting"), "got: {}", result);
+        assert!(result.contains("E0308"), "got: {result}");
+        assert!(result.contains("E0425"), "got: {result}");
+        assert!(!result.contains("aborting"), "got: {result}");
     }
 
     #[test]
     fn test_filter_cargo_install_locking_and_blocking() {
-        let output = r#"  Locking 45 packages to latest compatible versions
+        let output = r"  Locking 45 packages to latest compatible versions
   Blocking waiting for file lock on package cache
   Downloading crates ...
   Downloaded serde v1.0.200
@@ -1522,24 +1508,24 @@ error: aborting due to 2 previous errors
    Compiling rtk v0.11.0
     Finished `release` profile [optimized] target(s) in 30.0s
   Installing rtk v0.11.0
-"#;
+";
         let result = filter_cargo_install(output);
-        assert!(result.contains("cargo install"), "got: {}", result);
-        assert!(!result.contains("Locking"), "got: {}", result);
-        assert!(!result.contains("Blocking"), "got: {}", result);
-        assert!(!result.contains("Downloading"), "got: {}", result);
+        assert!(result.contains("cargo install"), "got: {result}");
+        assert!(!result.contains("Locking"), "got: {result}");
+        assert!(!result.contains("Blocking"), "got: {result}");
+        assert!(!result.contains("Downloading"), "got: {result}");
     }
 
     #[test]
     fn test_filter_cargo_install_from_path() {
-        let output = r#"  Installing /Users/user/projects/rtk
+        let output = r"  Installing /Users/user/projects/rtk
    Compiling rtk v0.11.0
     Finished `release` profile [optimized] target(s) in 10.0s
-"#;
+";
         let result = filter_cargo_install(output);
         // Path-based install: crate info not extracted from path
-        assert!(result.contains("cargo install"), "got: {}", result);
-        assert!(result.contains("1 deps compiled"), "got: {}", result);
+        assert!(result.contains("cargo install"), "got: {result}");
+        assert!(result.contains("1 deps compiled"), "got: {result}");
     }
 
     #[test]
@@ -1552,7 +1538,7 @@ error: aborting due to 2 previous errors
 
     #[test]
     fn test_filter_cargo_nextest_all_pass() {
-        let output = r#"   Compiling rtk v0.15.2
+        let output = r"   Compiling rtk v0.15.2
     Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
 ────────────────────────────
     Starting 301 tests across 1 binary
@@ -1561,18 +1547,17 @@ error: aborting due to 2 previous errors
         PASS [   0.007s] (301/301) rtk::bin/rtk cargo_cmd::tests::test_last
 ────────────────────────────
      Summary [   0.192s] 301 tests run: 301 passed, 0 skipped
-"#;
+";
         let result = filter_cargo_nextest(output);
         assert_eq!(
             result, "cargo nextest: 301 passed (1 binary, 0.192s)",
-            "got: {}",
-            result
+            "got: {result}"
         );
     }
 
     #[test]
     fn test_filter_cargo_nextest_with_failures() {
-        let output = r#"    Starting 4 tests across 1 binary (1 test skipped)
+        let output = r"    Starting 4 tests across 1 binary (1 test skipped)
         PASS [   0.006s] (1/4) test-proj tests::passing_test
         FAIL [   0.006s] (2/4) test-proj tests::failing_test
 
@@ -1597,67 +1582,59 @@ error: aborting due to 2 previous errors
         FAIL [   0.006s] (2/4) test-proj tests::failing_test
         FAIL [   0.006s] (4/4) test-proj tests::another_failing
 error: test run failed
-"#;
+";
         let result = filter_cargo_nextest(output);
         assert!(
             result.contains("tests::failing_test"),
-            "should contain first failure: {}",
-            result
+            "should contain first failure: {result}"
         );
         assert!(
             result.contains("tests::another_failing"),
-            "should contain second failure: {}",
-            result
+            "should contain second failure: {result}"
         );
         assert!(
             result.contains("panicked"),
-            "should contain stderr detail: {}",
-            result
+            "should contain stderr detail: {result}"
         );
         assert!(
             result.contains("2 passed, 2 failed, 1 skipped"),
-            "should contain summary: {}",
-            result
+            "should contain summary: {result}"
         );
         assert!(
             !result.contains("PASS"),
-            "should not contain PASS lines: {}",
-            result
+            "should not contain PASS lines: {result}"
         );
         // Post-summary FAIL recaps must not create duplicate FAIL header entries
         // (test names may appear in both header and stderr body naturally)
         assert_eq!(
             result.matches("FAIL [").count(),
             2,
-            "should have exactly 2 FAIL headers (no post-summary duplicates): {}",
-            result
+            "should have exactly 2 FAIL headers (no post-summary duplicates): {result}"
         );
         assert!(
             !result.contains("error: test run failed"),
-            "should not contain post-summary error line: {}",
-            result
+            "should not contain post-summary error line: {result}"
         );
     }
 
     #[test]
     fn test_filter_cargo_nextest_with_skipped() {
-        let output = r#"    Starting 50 tests across 2 binaries (3 tests skipped)
+        let output = r"    Starting 50 tests across 2 binaries (3 tests skipped)
         PASS [   0.010s] (1/50) rtk::bin/rtk test_one
         PASS [   0.010s] (50/50) rtk::bin/rtk test_last
 ────────────────────────────
      Summary [   0.500s] 50 tests run: 50 passed, 3 skipped
-"#;
+";
         let result = filter_cargo_nextest(output);
         assert_eq!(
             result, "cargo nextest: 50 passed, 3 skipped (2 binaries, 0.500s)",
-            "got: {}",
-            result
+            "got: {result}"
         );
     }
 
     #[test]
     fn test_filter_cargo_nextest_single_failure_detail() {
-        let output = r#"    Starting 2 tests across 1 binary
+        let output = r"    Starting 2 tests across 1 binary
         PASS [   0.005s] (1/2) proj tests::good
         FAIL [   0.005s] (2/2) proj tests::bad
 
@@ -1670,45 +1647,41 @@ error: test run failed
      Summary [   0.010s] 2 tests run: 1 passed, 1 failed
         FAIL [   0.005s] (2/2) proj tests::bad
 error: test run failed
-"#;
+";
         let result = filter_cargo_nextest(output);
         assert!(
             result.contains("assertion failed: false"),
-            "should show panic message: {}",
-            result
+            "should show panic message: {result}"
         );
         assert!(
             result.contains("1 passed, 1 failed"),
-            "should show summary: {}",
-            result
+            "should show summary: {result}"
         );
         // Post-summary recap must not duplicate FAIL headers
         assert_eq!(
             result.matches("FAIL [").count(),
             1,
-            "should have exactly 1 FAIL header (no post-summary duplicate): {}",
-            result
+            "should have exactly 1 FAIL header (no post-summary duplicate): {result}"
         );
     }
 
     #[test]
     fn test_filter_cargo_nextest_multiple_binaries() {
-        let output = r#"    Starting 100 tests across 5 binaries
+        let output = r"    Starting 100 tests across 5 binaries
         PASS [   0.010s] (100/100) test_last
 ────────────────────────────
      Summary [   1.234s] 100 tests run: 100 passed, 0 skipped
-"#;
+";
         let result = filter_cargo_nextest(output);
         assert_eq!(
             result, "cargo nextest: 100 passed (5 binaries, 1.234s)",
-            "got: {}",
-            result
+            "got: {result}"
         );
     }
 
     #[test]
     fn test_filter_cargo_nextest_compilation_stripped() {
-        let output = r#"   Compiling serde v1.0.200
+        let output = r"   Compiling serde v1.0.200
    Compiling rtk v0.15.2
    Downloading crates ...
     Finished `test` profile [unoptimized + debuginfo] target(s) in 5.00s
@@ -1717,39 +1690,32 @@ error: test run failed
         PASS [   0.010s] (10/10) test_last
 ────────────────────────────
      Summary [   0.050s] 10 tests run: 10 passed, 0 skipped
-"#;
+";
         let result = filter_cargo_nextest(output);
         assert!(
             !result.contains("Compiling"),
-            "should strip Compiling: {}",
-            result
+            "should strip Compiling: {result}"
         );
         assert!(
             !result.contains("Downloading"),
-            "should strip Downloading: {}",
-            result
+            "should strip Downloading: {result}"
         );
         assert!(
             !result.contains("Finished"),
-            "should strip Finished: {}",
-            result
+            "should strip Finished: {result}"
         );
-        assert!(
-            result.contains("cargo nextest: 10 passed"),
-            "got: {}",
-            result
-        );
+        assert!(result.contains("cargo nextest: 10 passed"), "got: {result}");
     }
 
     #[test]
     fn test_filter_cargo_nextest_empty() {
         let result = filter_cargo_nextest("");
-        assert!(result.is_empty(), "got: {}", result);
+        assert!(result.is_empty(), "got: {result}");
     }
 
     #[test]
     fn test_filter_cargo_nextest_cancellation_notice() {
-        let output = r#"    Starting 3 tests across 1 binary
+        let output = r"    Starting 3 tests across 1 binary
         FAIL [   0.005s] (1/3) proj tests::bad
 
   stderr ───
@@ -1761,39 +1727,35 @@ error: test run failed
      Summary [   0.010s] 3 tests run: 2 passed, 1 failed
         FAIL [   0.005s] (1/3) proj tests::bad
 error: test run failed
-"#;
+";
         let result = filter_cargo_nextest(output);
         assert!(
             result.contains("Cancelling due to test failure"),
-            "should include cancel notice: {}",
-            result
+            "should include cancel notice: {result}"
         );
         assert!(
             result.contains("1 failed"),
-            "should show failure count: {}",
-            result
+            "should show failure count: {result}"
         );
         // Post-summary recap must not duplicate FAIL headers
         assert_eq!(
             result.matches("FAIL [").count(),
             1,
-            "should have exactly 1 FAIL header (no post-summary duplicate): {}",
-            result
+            "should have exactly 1 FAIL header (no post-summary duplicate): {result}"
         );
     }
 
     #[test]
     fn test_filter_cargo_nextest_summary_regex_fallback() {
-        let output = r#"    Starting 5 tests across 1 binary
+        let output = r"    Starting 5 tests across 1 binary
         PASS [   0.005s] (5/5) test_last
 ────────────────────────────
      Summary MALFORMED LINE
-"#;
+";
         let result = filter_cargo_nextest(output);
         assert!(
             result.contains("Summary MALFORMED"),
-            "should fall back to raw summary: {}",
-            result
+            "should fall back to raw summary: {result}"
         );
     }
 }

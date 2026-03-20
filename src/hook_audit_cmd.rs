@@ -15,11 +15,12 @@ fn default_log_path() -> PathBuf {
 }
 
 /// A single parsed audit log entry.
+#[allow(dead_code)] // rewritten_cmd used in tests only
 struct AuditEntry {
     timestamp: String,
     action: String,
     original_cmd: String,
-    _rewritten_cmd: String,
+    rewritten_cmd: String,
 }
 
 /// Parse a single log line: "timestamp | action | original_cmd | rewritten_cmd"
@@ -32,7 +33,7 @@ fn parse_line(line: &str) -> Option<AuditEntry> {
         timestamp: parts[0].to_string(),
         action: parts[1].to_string(),
         original_cmd: parts[2].to_string(),
-        _rewritten_cmd: parts.get(3).unwrap_or(&"-").to_string(),
+        rewritten_cmd: parts.get(3).unwrap_or(&"-").to_string(),
     })
 }
 
@@ -88,7 +89,7 @@ pub fn run(since_days: u64, verbose: u8) -> Result<()> {
     let filtered = filter_since_days(&entries, since_days);
 
     if filtered.is_empty() {
-        println!("No entries in the last {} days.", since_days);
+        println!("No entries in the last {since_days} days.");
         return Ok(());
     }
 
@@ -123,14 +124,14 @@ pub fn run(since_days: u64, verbose: u8) -> Result<()> {
     let period = if since_days == 0 {
         "all time".to_string()
     } else {
-        format!("last {} days", since_days)
+        format!("last {since_days} days")
     };
 
-    println!("Hook Audit ({})", period);
+    println!("Hook Audit ({period})");
     println!("{}", "─".repeat(30));
-    println!("Total invocations: {}", total);
-    println!("Rewrites:          {} ({:.1}%)", rewrites, rewrite_pct);
-    println!("Skips:             {} ({:.1}%)", skips, skip_pct);
+    println!("Total invocations: {total}");
+    println!("Rewrites:          {rewrites} ({rewrite_pct:.1}%)");
+    println!("Skips:             {skips} ({skip_pct:.1}%)");
 
     // Skip breakdown
     let skip_actions: Vec<(&str, usize)> = action_counts
@@ -160,7 +161,7 @@ pub fn run(since_days: u64, verbose: u8) -> Result<()> {
         let top: Vec<String> = sorted_cmds
             .iter()
             .take(5)
-            .map(|(cmd, count)| format!("{} ({})", cmd, count))
+            .map(|(cmd, count)| format!("{cmd} ({count})"))
             .collect();
         println!("Top commands: {}", top.join(", "));
     }
@@ -182,7 +183,7 @@ mod tests {
         let entry = parse_line(line).unwrap();
         assert_eq!(entry.action, "rewrite");
         assert_eq!(entry.original_cmd, "git status");
-        assert_eq!(entry._rewritten_cmd, "rtk git status");
+        assert_eq!(entry.rewritten_cmd, "rtk git status");
     }
 
     #[test]
@@ -222,7 +223,7 @@ mod tests {
             timestamp: "2026-02-16T14:30:00Z".to_string(),
             action: action.to_string(),
             original_cmd: cmd.to_string(),
-            _rewritten_cmd: "-".to_string(),
+            rewritten_cmd: "-".to_string(),
         }
     }
 
@@ -239,14 +240,14 @@ mod tests {
     #[test]
     fn test_token_savings() {
         // Simulate what rtk hook-audit would output vs raw log dump
-        let raw_log = r#"2026-02-16T14:30:01Z | rewrite | git status | rtk git status
+        let raw_log = r"2026-02-16T14:30:01Z | rewrite | git status | rtk git status
 2026-02-16T14:30:02Z | skip:no_match | echo hello | -
 2026-02-16T14:30:03Z | rewrite | cargo test | rtk cargo test
 2026-02-16T14:30:04Z | skip:already_rtk | rtk git log | -
 2026-02-16T14:30:05Z | rewrite | git log --oneline -10 | rtk git log --oneline -10
 2026-02-16T14:30:06Z | rewrite | gh pr view 42 | rtk gh pr view 42
 2026-02-16T14:30:07Z | skip:no_match | mkdir -p foo | -
-2026-02-16T14:30:08Z | rewrite | cargo clippy --all-targets | rtk cargo clippy --all-targets"#;
+2026-02-16T14:30:08Z | rewrite | cargo clippy --all-targets | rtk cargo clippy --all-targets";
 
         let entries: Vec<AuditEntry> = raw_log.lines().filter_map(parse_line).collect();
         assert_eq!(entries.len(), 8);
@@ -276,8 +277,7 @@ mod tests {
         let savings = 100.0 - (output_tokens as f64 / input_tokens as f64 * 100.0);
         assert!(
             savings >= 30.0,
-            "Expected >=30% savings for audit summary, got {:.1}%",
-            savings
+            "Expected >=30% savings for audit summary, got {savings:.1}%"
         );
     }
 }

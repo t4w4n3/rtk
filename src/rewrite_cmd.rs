@@ -17,7 +17,7 @@ pub fn run(cmd: &str) -> anyhow::Result<()> {
 
     match registry::rewrite_command(cmd, &excluded) {
         Some(rewritten) => {
-            print!("{}", rewritten);
+            print!("{rewritten}");
             Ok(())
         }
         None => {

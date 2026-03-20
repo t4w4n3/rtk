@@ -22,7 +22,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let raw = format!("{}\n{}", stdout, stderr);
+    let raw = format!("{stdout}\n{stderr}");
 
     // #221: If prettier is not installed or produced no meaningful output,
     // show stderr as-is instead of a misleading "All files formatted" message.
@@ -32,7 +32,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         if msg.is_empty() {
             eprintln!("Error: prettier not found or produced no output");
         } else {
-            eprintln!("{}", msg);
+            eprintln!("{msg}");
         }
         timer.track(
             &format!("prettier {}", args.join(" ")),
@@ -45,7 +45,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     let filtered = filter_prettier_output(&raw);
 
-    println!("{}", filtered);
+    println!("{filtered}");
 
     timer.track(
         &format!("prettier {}", args.join(" ")),
@@ -88,14 +88,18 @@ pub fn filter_prettier_output(output: &str) -> String {
             && !trimmed.starts_with("Code style")
             && !trimmed.contains("[warn]")
             && !trimmed.contains("[error]")
-            && (trimmed.ends_with(".ts")
-                || trimmed.ends_with(".tsx")
-                || trimmed.ends_with(".js")
-                || trimmed.ends_with(".jsx")
-                || trimmed.ends_with(".json")
-                || trimmed.ends_with(".md")
-                || trimmed.ends_with(".css")
-                || trimmed.ends_with(".scss"))
+            && (std::path::Path::new(trimmed)
+                .extension()
+                .is_some_and(|ext| {
+                    ext.eq_ignore_ascii_case("ts")
+                        || ext.eq_ignore_ascii_case("tsx")
+                        || ext.eq_ignore_ascii_case("js")
+                        || ext.eq_ignore_ascii_case("jsx")
+                        || ext.eq_ignore_ascii_case("json")
+                        || ext.eq_ignore_ascii_case("md")
+                        || ext.eq_ignore_ascii_case("css")
+                        || ext.eq_ignore_ascii_case("scss")
+                }))
         {
             files_to_format.push(trimmed.to_string());
         }
@@ -168,10 +172,10 @@ mod tests {
 
     #[test]
     fn test_filter_all_formatted() {
-        let output = r#"
+        let output = r"
 Checking formatting...
 All matched files use Prettier code style!
-        "#;
+        ";
         let result = filter_prettier_output(output);
         assert!(result.contains("Prettier"));
         assert!(result.contains("All files formatted correctly"));
@@ -179,13 +183,13 @@ All matched files use Prettier code style!
 
     #[test]
     fn test_filter_files_need_formatting() {
-        let output = r#"
+        let output = r"
 Checking formatting...
 src/components/ui/button.tsx
 src/lib/auth/session.ts
 src/pages/dashboard.tsx
 Code style issues found in the above file(s). Forgot to run Prettier?
-        "#;
+        ";
         let result = filter_prettier_output(output);
         assert!(result.contains("3 files need formatting"));
         assert!(result.contains("button.tsx"));
@@ -196,7 +200,7 @@ Code style issues found in the above file(s). Forgot to run Prettier?
     fn test_filter_many_files() {
         let mut output = String::from("Checking formatting...\n");
         for i in 0..15 {
-            output.push_str(&format!("src/file{}.ts\n", i));
+            output.push_str(&format!("src/file{i}.ts\n"));
         }
         let result = filter_prettier_output(&output);
         assert!(result.contains("15 files need formatting"));

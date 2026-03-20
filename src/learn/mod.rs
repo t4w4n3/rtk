@@ -34,7 +34,7 @@ pub fn run(
     let sessions = provider.discover_sessions(project_filter.as_deref(), Some(since))?;
 
     if sessions.is_empty() {
-        println!("No Claude Code sessions found in the last {} days.", since);
+        println!("No Claude Code sessions found in the last {since} days.");
         return Ok(());
     }
 
@@ -86,32 +86,29 @@ pub fn run(
     rules.retain(|r| r.occurrences >= min_occurrences);
 
     // Output
-    match format.as_str() {
-        "json" => {
-            // JSON output
-            let json = serde_json::json!({
-                "sessions_scanned": sessions.len(),
-                "total_corrections": filtered.len(),
-                "rules": rules.iter().map(|r| serde_json::json!({
-                    "wrong": r.wrong_pattern,
-                    "right": r.right_pattern,
-                    "error_type": r.error_type.as_str(),
-                    "occurrences": r.occurrences,
-                    "base_command": r.base_command,
-                })).collect::<Vec<_>>(),
-            });
-            println!("{}", serde_json::to_string_pretty(&json)?);
-        }
-        _ => {
-            // Text output
-            let report = format_console_report(&rules, filtered.len(), sessions.len(), since);
-            print!("{}", report);
+    if format.as_str() == "json" {
+        // JSON output
+        let json = serde_json::json!({
+            "sessions_scanned": sessions.len(),
+            "total_corrections": filtered.len(),
+            "rules": rules.iter().map(|r| serde_json::json!({
+                "wrong": r.wrong_pattern,
+                "right": r.right_pattern,
+                "error_type": r.error_type.as_str(),
+                "occurrences": r.occurrences,
+                "base_command": r.base_command,
+            })).collect::<Vec<_>>(),
+        });
+        println!("{}", serde_json::to_string_pretty(&json)?);
+    } else {
+        // Text output
+        let report = format_console_report(&rules, filtered.len(), sessions.len(), since);
+        print!("{report}");
 
-            if write_rules && !rules.is_empty() {
-                let rules_path = ".claude/rules/cli-corrections.md";
-                write_rules_file(&rules, rules_path)?;
-                println!("\nWritten to: {}", rules_path);
-            }
+        if write_rules && !rules.is_empty() {
+            let rules_path = ".claude/rules/cli-corrections.md";
+            write_rules_file(&rules, rules_path)?;
+            println!("\nWritten to: {rules_path}");
         }
     }
 

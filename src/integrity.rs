@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 const HASH_FILENAME: &str = ".rtk-hook.sha256";
 
 /// Result of hook integrity verification
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum IntegrityStatus {
     /// Hash matches — hook is unmodified since last install/update
     Verified,
@@ -48,7 +48,7 @@ pub fn compute_hash(path: &Path) -> Result<String> {
 fn hash_path(hook_path: &Path) -> PathBuf {
     hook_path
         .parent()
-        .unwrap_or(Path::new("."))
+        .unwrap_or_else(|| Path::new("."))
         .join(HASH_FILENAME)
 }
 
@@ -71,7 +71,7 @@ pub fn store_hash(hook_path: &Path) -> Result<()> {
         .and_then(|n| n.to_str())
         .unwrap_or("rtk-rewrite.sh");
 
-    let content = format!("{}  {}\n", hash, filename);
+    let content = format!("{hash}  {filename}\n");
 
     // If hash file exists and is read-only, make it writable first
     #[cfg(unix)]
@@ -199,14 +199,14 @@ pub fn run_verify(verbose: u8) -> Result<()> {
         IntegrityStatus::Verified => {
             let hash = compute_hash(&hook_path)?;
             println!("PASS  hook integrity verified");
-            println!("      sha256:{}", hash);
+            println!("      sha256:{hash}");
             println!("      {}", hook_path.display());
         }
         IntegrityStatus::Tampered { expected, actual } => {
             eprintln!("FAIL  hook integrity check FAILED");
             eprintln!();
-            eprintln!("  Expected: {}", expected);
-            eprintln!("  Actual:   {}", actual);
+            eprintln!("  Expected: {expected}");
+            eprintln!("  Actual:   {actual}");
             eprintln!();
             eprintln!("  The hook file has been modified outside of `rtk init`.");
             eprintln!("  This could indicate tampering or a manual edit.");
@@ -244,12 +244,9 @@ pub fn run_verify(verbose: u8) -> Result<()> {
 /// re-run `rtk init -g --auto-patch` to re-establish the baseline.
 pub fn runtime_check() -> Result<()> {
     match verify_hook()? {
-        IntegrityStatus::Verified | IntegrityStatus::NotInstalled => {
+        IntegrityStatus::Verified | IntegrityStatus::NotInstalled | IntegrityStatus::NoBaseline => {
             // All good, proceed
-        }
-        IntegrityStatus::NoBaseline => {
-            // Installed before integrity checks — don't block
-            // Silently skip to avoid noise for users who haven't re-run init
+            // (NoBaseline: installed before integrity checks — don't block)
         }
         IntegrityStatus::Tampered { expected, actual } => {
             eprintln!("rtk: hook integrity check FAILED");
@@ -342,7 +339,7 @@ mod tests {
                 assert_eq!(expected.len(), 64);
                 assert_eq!(actual.len(), 64);
             }
-            other => panic!("Expected Tampered, got {:?}", other),
+            other => panic!("Expected Tampered, got {other:?}"),
         }
     }
 

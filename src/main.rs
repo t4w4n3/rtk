@@ -1,3 +1,86 @@
+// Pedantic/nursery lints enabled globally. Specific lints allowed where they
+// produce false positives or hurt readability in RTK's CLI-proxy context.
+#![allow(
+    // Cast lints: RTK intentionally casts between numeric types for percentage
+    // calculations (usize→f64), SQLite results (i64→usize), and display math.
+    // These are all controlled, small-value casts where precision/truncation
+    // is not a concern.
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+    // Doc lints: RTK is a CLI tool, not a library. Internal docs don't need
+    // backtick formatting, error docs, or panic docs.
+    clippy::doc_markdown,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    // Naming: module_name_repetitions fires on e.g. `git::GitArgs` which is
+    // the natural naming for CLI arg structs.
+    clippy::module_name_repetitions,
+    // Style preferences that reduce readability in RTK's filter code:
+    // - option_if_let_else: if-let is clearer than map_or_else for complex bodies
+    // - suboptimal_flops: mul_add() obscures simple arithmetic
+    // - float_cmp: percentage comparisons are fine with == in tests
+    // - missing_const_for_fn: nursery lint, many false positives
+    // - cognitive_complexity: some filters are inherently complex parsers
+    // - too_many_lines: filter functions are long by nature
+    clippy::option_if_let_else,
+    clippy::suboptimal_flops,
+    clippy::float_cmp,
+    clippy::missing_const_for_fn,
+    clippy::cognitive_complexity,
+    clippy::too_many_lines,
+    // Function signature lints not worth changing across 50+ modules:
+    // - fn_params_excessive_bools: some functions genuinely need multiple flags
+    // - must_use_candidate: noisy for internal functions
+    // - return_self_not_must_use: irrelevant for CLI
+    // - needless_pass_by_value: often intentional for API ergonomics
+    // - trivially_copy_pass_by_ref: micro-optimization not needed
+    // - unnecessary_wraps: Result return for consistency across modules
+    clippy::fn_params_excessive_bools,
+    clippy::must_use_candidate,
+    clippy::return_self_not_must_use,
+    clippy::needless_pass_by_value,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::unnecessary_wraps,
+    // use_self: fires on `Self` vs type name in impl blocks — noisy, cosmetic only.
+    clippy::use_self,
+    // format_push_string: `push_str(&format!(...))` is the established RTK pattern
+    // for building filter output. Changing 263 instances to write!() adds complexity
+    // (import std::fmt::Write, handle Result) for negligible perf gain in output
+    // formatting that runs once per command invocation.
+    clippy::format_push_string,
+    // non_std_lazy_statics: lazy_static! is RTK's established regex pattern (23 uses).
+    // Migration to LazyLock is a separate modernization task.
+    clippy::non_std_lazy_statics,
+    // manual_let_else: if-let with explicit else is often clearer in filter parsing
+    // code where the else branch does more than just return/continue.
+    clippy::manual_let_else,
+    // items_after_statements: helper functions/structs defined near their usage
+    // in long filter functions aids readability.
+    clippy::items_after_statements,
+    // similar_names: variable names like `line`/`lines`, `input`/`output` are natural.
+    clippy::similar_names,
+    // map_unwrap_or: `.map(f).unwrap_or(x)` is often more readable than `.map_or(x, f)`
+    // when the closure is multi-line. 24 occurrences across filter modules.
+    clippy::map_unwrap_or,
+    // or_fun_call: `.unwrap_or(f())` vs `.unwrap_or_else(|| f())` — cosmetic in RTK.
+    clippy::or_fun_call,
+    // match_same_arms: RTK match arms are kept separate for clarity even when
+    // bodies match — each arm documents a distinct command/variant.
+    clippy::match_same_arms,
+    // branches_sharing_code: moving shared code out of branches often hurts readability.
+    clippy::branches_sharing_code,
+    // struct_field_names: field naming follows domain conventions.
+    clippy::struct_field_names,
+    // used_underscore_binding: false positive with pattern matching.
+    clippy::used_underscore_binding,
+    // redundant_pub_crate: pub(crate) in private module is intentional for documentation.
+    clippy::redundant_pub_crate,
+    // comparison_chain: if/else if chains are clearer than match for 2-3 comparisons.
+    clippy::comparison_chain,
+)]
+
 mod aws_cmd;
 mod binlog;
 mod cargo_cmd;
@@ -75,7 +158,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 /// Target agent for hook installation.
-#[derive(Debug, Clone, Copy, PartialEq, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum AgentTarget {
     /// Claude Code (default)
     Claude,
@@ -1115,10 +1198,9 @@ fn run_fallback(parse_error: clap::Error) -> Result<()> {
     let lookup_cmd = {
         let base = std::path::Path::new(&args[0])
             .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| args[0].clone());
+            .map_or_else(|| args[0].clone(), |n| n.to_string_lossy().into_owned());
         std::iter::once(base.as_str())
-            .chain(args[1..].iter().map(|s| s.as_str()))
+            .chain(args[1..].iter().map(std::string::String::as_str))
             .collect::<Vec<_>>()
             .join(" ")
     };
@@ -1142,21 +1224,21 @@ fn run_fallback(parse_error: clap::Error) -> Result<()> {
                 let stdout_raw = String::from_utf8_lossy(&output.stdout);
 
                 // Tee raw output BEFORE filtering on failure — lets LLM re-read if needed
-                let tee_hint = if !output.status.success() {
-                    tee::tee_and_hint(&stdout_raw, &raw_command, output.status.code().unwrap_or(1))
-                } else {
+                let tee_hint = if output.status.success() {
                     None
+                } else {
+                    tee::tee_and_hint(&stdout_raw, &raw_command, output.status.code().unwrap_or(1))
                 };
 
                 let filtered = toml_filter::apply_filter(filter, &stdout_raw);
-                println!("{}", filtered);
+                println!("{filtered}");
                 if let Some(hint) = tee_hint {
-                    println!("{}", hint);
+                    println!("{hint}");
                 }
 
                 timer.track(
                     &raw_command,
-                    &format!("rtk:toml {}", raw_command),
+                    &format!("rtk:toml {raw_command}"),
                     &stdout_raw,
                     &filtered,
                 );
@@ -1169,7 +1251,7 @@ fn run_fallback(parse_error: clap::Error) -> Result<()> {
             Err(e) => {
                 // Command not found — same behaviour as no-TOML path
                 tracking::record_parse_failure_silent(&raw_command, &error_message, false);
-                eprintln!("[rtk: {}]", e);
+                eprintln!("[rtk: {e}]");
                 std::process::exit(127);
             }
         }
@@ -1184,7 +1266,7 @@ fn run_fallback(parse_error: clap::Error) -> Result<()> {
 
         match status {
             Ok(s) => {
-                timer.track_passthrough(&raw_command, &format!("rtk fallback: {}", raw_command));
+                timer.track_passthrough(&raw_command, &format!("rtk fallback: {raw_command}"));
 
                 tracking::record_parse_failure_silent(&raw_command, &error_message, true);
 
@@ -1195,7 +1277,7 @@ fn run_fallback(parse_error: clap::Error) -> Result<()> {
             Err(e) => {
                 tracking::record_parse_failure_silent(&raw_command, &error_message, false);
                 // Command not found or other OS error — single message, no duplicate Clap error
-                eprintln!("[rtk: {}]", e);
+                eprintln!("[rtk: {e}]");
                 std::process::exit(127);
             }
         }
@@ -1242,7 +1324,7 @@ enum GtCommands {
 }
 
 /// Split a string into shell-like tokens, respecting single and double quotes.
-/// e.g. `git log --format="%H %s"` → ["git", "log", "--format=%H %s"]
+/// e.g. `git log --format="%H %s"` → `["git", "log", "--format=%H %s"]`
 fn shell_split(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();
@@ -1976,8 +2058,8 @@ fn main() -> Result<()> {
                                 let status = cmd.status().context("Failed to run npx prisma")?;
                                 let args_str = args.join(" ");
                                 timer.track_passthrough(
-                                    &format!("npx {}", args_str),
-                                    &format!("rtk npx {} (passthrough)", args_str),
+                                    &format!("npx {args_str}"),
+                                    &format!("rtk npx {args_str} (passthrough)"),
                                 );
                                 if !status.success() {
                                     std::process::exit(status.code().unwrap_or(1));
@@ -2144,7 +2226,7 @@ fn main() -> Result<()> {
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
-                .context(format!("Failed to execute command: {}", cmd_name))?;
+                .context(format!("Failed to execute command: {cmd_name}"))?;
 
             let stdout_pipe = child
                 .stdout
@@ -2195,7 +2277,7 @@ fn main() -> Result<()> {
 
             let status = child
                 .wait()
-                .context(format!("Failed waiting for command: {}", cmd_name))?;
+                .context(format!("Failed waiting for command: {cmd_name}"))?;
 
             let stdout_bytes = stdout_handle
                 .join()
@@ -2206,7 +2288,7 @@ fn main() -> Result<()> {
 
             let stdout = String::from_utf8_lossy(&stdout_bytes);
             let stderr = String::from_utf8_lossy(&stderr_bytes);
-            let full_output = format!("{}{}", stdout, stderr);
+            let full_output = format!("{stdout}{stderr}");
 
             // Track usage (input = output since no filtering)
             timer.track(
@@ -2522,8 +2604,7 @@ mod tests {
             let result = Cli::try_parse_from(["rtk", cmd, "--nonexistent-flag-xyz"]);
             assert!(
                 result.is_err(),
-                "Meta-command '{}' with bad flag should fail to parse",
-                cmd
+                "Meta-command '{cmd}' with bad flag should fail to parse"
             );
         }
     }
@@ -2545,8 +2626,7 @@ mod tests {
             let result = Cli::try_parse_from(args.iter());
             assert!(
                 result.is_ok(),
-                "Meta-command {:?} should parse successfully",
-                args
+                "Meta-command {args:?} should parse successfully"
             );
         }
     }

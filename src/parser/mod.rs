@@ -32,8 +32,7 @@ impl<T> ParseResult<T> {
     #[allow(dead_code)]
     pub fn unwrap(self) -> T {
         match self {
-            ParseResult::Full(data) => data,
-            ParseResult::Degraded(data, _) => data,
+            ParseResult::Full(data) | ParseResult::Degraded(data, _) => data,
             ParseResult::Passthrough(_) => panic!("Called unwrap on Passthrough result"),
         }
     }
@@ -125,12 +124,12 @@ pub fn truncate_output(output: &str, max_chars: usize) -> String {
 
 /// Helper to emit degradation warning
 pub fn emit_degradation_warning(tool: &str, reason: &str) {
-    eprintln!("[RTK:DEGRADED] {} parser: {}", tool, reason);
+    eprintln!("[RTK:DEGRADED] {tool} parser: {reason}");
 }
 
 /// Helper to emit passthrough warning
 pub fn emit_passthrough_warning(tool: &str, reason: &str) {
-    eprintln!("[RTK:PASSTHROUGH] {} parser: {}", tool, reason);
+    eprintln!("[RTK:PASSTHROUGH] {tool} parser: {reason}");
 }
 
 /// Extract a complete JSON object from input that may have non-JSON prefix (pnpm banner, dotenv messages, etc.)

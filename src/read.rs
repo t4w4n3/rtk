@@ -26,11 +26,10 @@ pub fn run(
     let lang = file
         .extension()
         .and_then(|e| e.to_str())
-        .map(Language::from_extension)
-        .unwrap_or(Language::Unknown);
+        .map_or(Language::Unknown, Language::from_extension);
 
     if verbose > 1 {
-        eprintln!("Detected language: {:?}", lang);
+        eprintln!("Detected language: {lang:?}");
     }
 
     // Apply filter
@@ -45,10 +44,7 @@ pub fn run(
         } else {
             0.0
         };
-        eprintln!(
-            "Lines: {} -> {} ({:.1}% reduction)",
-            original_lines, filtered_lines, reduction
-        );
+        eprintln!("Lines: {original_lines} -> {filtered_lines} ({reduction:.1}% reduction)");
     }
 
     filtered = apply_line_window(&filtered, max_lines, tail_lines, &lang);
@@ -56,9 +52,9 @@ pub fn run(
     let rtk_output = if line_numbers {
         format_with_line_numbers(&filtered)
     } else {
-        filtered.clone()
+        filtered
     };
-    println!("{}", rtk_output);
+    println!("{rtk_output}");
     timer.track(
         &format!("cat {}", file.display()),
         "rtk read",
@@ -80,7 +76,7 @@ pub fn run_stdin(
     let timer = tracking::TimedExecution::start();
 
     if verbose > 0 {
-        eprintln!("Reading from stdin (filter: {})", level);
+        eprintln!("Reading from stdin (filter: {level})");
     }
 
     // Read from stdin
@@ -94,7 +90,7 @@ pub fn run_stdin(
     let lang = Language::Unknown;
 
     if verbose > 1 {
-        eprintln!("Language: {:?} (stdin has no extension)", lang);
+        eprintln!("Language: {lang:?} (stdin has no extension)");
     }
 
     // Apply filter
@@ -109,10 +105,7 @@ pub fn run_stdin(
         } else {
             0.0
         };
-        eprintln!(
-            "Lines: {} -> {} ({:.1}% reduction)",
-            original_lines, filtered_lines, reduction
-        );
+        eprintln!("Lines: {original_lines} -> {filtered_lines} ({reduction:.1}% reduction)");
     }
 
     filtered = apply_line_window(&filtered, max_lines, tail_lines, &lang);
@@ -120,9 +113,9 @@ pub fn run_stdin(
     let rtk_output = if line_numbers {
         format_with_line_numbers(&filtered)
     } else {
-        filtered.clone()
+        filtered
     };
-    println!("{}", rtk_output);
+    println!("{rtk_output}");
 
     timer.track("cat - (stdin)", "rtk read -", &content, &rtk_output);
     Ok(())

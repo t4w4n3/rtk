@@ -191,7 +191,7 @@ fn format_tokens(tokens: usize) -> String {
     } else if tokens >= 1_000 {
         format!("{:.1}K tokens", tokens as f64 / 1_000.0)
     } else {
-        format!("{} tokens", tokens)
+        format!("{tokens} tokens")
     }
 }
 
@@ -205,6 +205,6 @@ fn truncate_str(s: &str, max: usize) -> String {
             .take_while(|(i, _)| *i < max.saturating_sub(2))
             .map(|(_, c)| c)
             .collect();
-        format!("{}..", truncated)
+        format!("{truncated}..")
     }
 }

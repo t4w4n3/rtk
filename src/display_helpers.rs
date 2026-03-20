@@ -9,13 +9,13 @@ use crate::utils::format_tokens;
 /// Format duration in milliseconds to human-readable string
 pub fn format_duration(ms: u64) -> String {
     if ms < 1000 {
-        format!("{}ms", ms)
+        format!("{ms}ms")
     } else if ms < 60_000 {
         format!("{:.1}s", ms as f64 / 1000.0)
     } else {
         let minutes = ms / 60_000;
         let seconds = (ms % 60_000) / 1000;
-        format!("{}m{}s", minutes, seconds)
+        format!("{minutes}m{seconds}s")
     }
 }
 
@@ -75,7 +75,7 @@ pub fn print_period_table<T: PeriodStats>(data: &[T]) {
         data.len(),
         T::label().to_lowercase()
     );
-    println!("{}", separator);
+    println!("{separator}");
     println!(
         "{:<width$} {:>7} {:>10} {:>10} {:>10} {:>7} {:>8}",
         match T::label() {
@@ -108,11 +108,11 @@ pub fn print_period_table<T: PeriodStats>(data: &[T]) {
     }
 
     // Compute totals
-    let total_cmds: usize = data.iter().map(|d| d.commands()).sum();
-    let total_input: usize = data.iter().map(|d| d.input_tokens()).sum();
-    let total_output: usize = data.iter().map(|d| d.output_tokens()).sum();
-    let total_saved: usize = data.iter().map(|d| d.saved_tokens()).sum();
-    let total_time: u64 = data.iter().map(|d| d.total_time_ms()).sum();
+    let total_cmds: usize = data.iter().map(PeriodStats::commands).sum();
+    let total_input: usize = data.iter().map(PeriodStats::input_tokens).sum();
+    let total_output: usize = data.iter().map(PeriodStats::output_tokens).sum();
+    let total_saved: usize = data.iter().map(PeriodStats::saved_tokens).sum();
+    let total_time: u64 = data.iter().map(PeriodStats::total_time_ms).sum();
     let avg_pct = if total_input > 0 {
         (total_saved as f64 / total_input as f64) * 100.0
     } else {
@@ -211,7 +211,7 @@ impl PeriodStats for WeekStats {
         } else {
             &self.week_end
         };
-        format!("{} → {}", start, end)
+        format!("{start} → {end}")
     }
 
     fn commands(&self) -> usize {

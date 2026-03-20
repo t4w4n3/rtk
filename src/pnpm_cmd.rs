@@ -97,7 +97,7 @@ fn collect_dependencies(
             current_version: version.clone(),
             latest_version: None,
             wanted_version: None,
-            dev_dependency: is_dev,
+            is_dev,
         });
         *count += 1;
     }
@@ -140,7 +140,7 @@ fn extract_list_text(output: &str) -> Option<DependencyState> {
                         current_version: version.to_string(),
                         latest_version: None,
                         wanted_version: None,
-                        dev_dependency: false,
+                        is_dev: false,
                     });
                     count += 1;
                 }
@@ -182,7 +182,7 @@ impl OutputParser for PnpmOutdatedParser {
                         current_version: pkg.current.clone(),
                         latest_version: Some(pkg.latest.clone()),
                         wanted_version: pkg.wanted.clone(),
-                        dev_dependency: pkg.dependency_type == "devDependencies",
+                        is_dev: pkg.dependency_type == "devDependencies",
                     });
                 }
 
@@ -243,20 +243,20 @@ fn extract_outdated_text(output: &str) -> Option<DependencyState> {
                 name: name.to_string(),
                 current_version: current.to_string(),
                 latest_version: Some(latest.to_string()),
-                wanted_version: parts.get(2).map(|s| s.to_string()),
-                dev_dependency: false,
+                wanted_version: parts.get(2).map(std::string::ToString::to_string),
+                is_dev: false,
             });
         }
     }
 
-    if !dependencies.is_empty() {
+    if dependencies.is_empty() {
+        None
+    } else {
         Some(DependencyState {
             total_packages: dependencies.len(),
             outdated_count,
             dependencies,
         })
-    } else {
-        None
     }
 }
 
@@ -296,7 +296,7 @@ fn run_list(depth: usize, args: &[String], verbose: u8) -> Result<()> {
 
     let mut cmd = resolved_command("pnpm");
     cmd.arg("list");
-    cmd.arg(format!("--depth={}", depth));
+    cmd.arg(format!("--depth={depth}"));
     cmd.arg("--json");
 
     for arg in args {
@@ -307,7 +307,7 @@ fn run_list(depth: usize, args: &[String], verbose: u8) -> Result<()> {
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        eprint!("{}", stderr);
+        eprint!("{stderr}");
         std::process::exit(output.status.code().unwrap_or(1));
     }
 
@@ -336,11 +336,11 @@ fn run_list(depth: usize, args: &[String], verbose: u8) -> Result<()> {
         }
     };
 
-    println!("{}", filtered);
+    println!("{filtered}");
 
     timer.track(
-        &format!("pnpm list --depth={}", depth),
-        &format!("rtk pnpm list --depth={}", depth),
+        &format!("pnpm list --depth={depth}"),
+        &format!("rtk pnpm list --depth={depth}"),
         &stdout,
         &filtered,
     );
@@ -363,7 +363,7 @@ fn run_outdated(args: &[String], verbose: u8) -> Result<()> {
     let output = cmd.output().context("Failed to run pnpm outdated")?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let combined = format!("{}{}", stdout, stderr);
+    let combined = format!("{stdout}{stderr}");
 
     // Parse output using PnpmOutdatedParser
     let parse_result = PnpmOutdatedParser::parse(&stdout);
@@ -391,7 +391,7 @@ fn run_outdated(args: &[String], verbose: u8) -> Result<()> {
     if filtered.trim().is_empty() {
         println!("All packages up-to-date");
     } else {
-        println!("{}", filtered);
+        println!("{filtered}");
     }
 
     timer.track("pnpm outdated", "rtk pnpm outdated", &combined, &filtered);
@@ -405,10 +405,7 @@ fn run_install(packages: &[String], args: &[String], verbose: u8) -> Result<()> 
     // Validate package names to prevent command injection
     for pkg in packages {
         if !is_valid_package_name(pkg) {
-            anyhow::bail!(
-                "Invalid package name: '{}' (contains unsafe characters)",
-                pkg
-            );
+            anyhow::bail!("Invalid package name: '{pkg}' (contains unsafe characters)");
         }
     }
 
@@ -432,14 +429,14 @@ fn run_install(packages: &[String], args: &[String], verbose: u8) -> Result<()> 
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     if !output.status.success() {
-        eprint!("{}", stderr);
+        eprint!("{stderr}");
         std::process::exit(output.status.code().unwrap_or(1));
     }
 
-    let combined = format!("{}{}", stdout, stderr);
+    let combined = format!("{stdout}{stderr}");
     let filtered = filter_pnpm_install(&combined);
 
-    println!("{}", filtered);
+    println!("{filtered}");
 
     timer.track(
         &format!("pnpm install {}", packages.join(" ")),
@@ -495,7 +492,7 @@ pub fn run_passthrough(args: &[OsString], verbose: u8) -> Result<()> {
     let timer = tracking::TimedExecution::start();
 
     if verbose > 0 {
-        eprintln!("pnpm passthrough: {:?}", args);
+        eprintln!("pnpm passthrough: {args:?}");
     }
     let status = resolved_command("pnpm")
         .args(args)
@@ -504,8 +501,8 @@ pub fn run_passthrough(args: &[OsString], verbose: u8) -> Result<()> {
 
     let args_str = tracking::args_display(args);
     timer.track_passthrough(
-        &format!("pnpm {}", args_str),
-        &format!("rtk pnpm {} (passthrough)", args_str),
+        &format!("pnpm {args_str}"),
+        &format!("rtk pnpm {args_str} (passthrough)"),
     );
 
     if !status.success() {

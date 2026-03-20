@@ -28,7 +28,7 @@ pub fn run_file(file: &Path, verbose: u8) -> Result<()> {
 
     let content = fs::read_to_string(file)?;
     let result = analyze_logs(&content);
-    println!("{}", result);
+    println!("{result}");
     timer.track(
         &format!("cat {}", file.display()),
         "rtk log",
@@ -50,7 +50,7 @@ pub fn run_stdin(_verbose: u8) -> Result<()> {
     }
 
     let result = analyze_logs(&content);
-    println!("{}", result);
+    println!("{result}");
 
     timer.track("log (stdin)", "rtk log (stdin)", &content, &result);
 
@@ -116,7 +116,7 @@ fn analyze_logs(content: &str) -> String {
         total_warnings,
         warn_counts.len()
     ));
-    result.push(format!("   [info] {} info messages", total_info));
+    result.push(format!("   [info] {total_info} info messages"));
     result.push(String::new());
 
     // Errors with counts
@@ -135,20 +135,19 @@ fn analyze_logs(content: &str) -> String {
                     &normalize_log_line(e, &TIMESTAMP_RE, &UUID_RE, &HEX_RE, &NUM_RE, &PATH_RE)
                         == *normalized
                 })
-                .map(|s| s.as_str())
-                .unwrap_or(normalized);
+                .map_or(normalized.as_str(), |s| s.as_str());
 
             let truncated = if original.len() > 100 {
                 let t: String = original.chars().take(97).collect();
-                format!("{}...", t)
+                format!("{t}...")
             } else {
                 original.to_string()
             };
 
             if **count > 1 {
-                result.push(format!("   [×{}] {}", count, truncated));
+                result.push(format!("   [×{count}] {truncated}"));
             } else {
-                result.push(format!("   {}", truncated));
+                result.push(format!("   {truncated}"));
             }
         }
 
@@ -175,20 +174,19 @@ fn analyze_logs(content: &str) -> String {
                     &normalize_log_line(w, &TIMESTAMP_RE, &UUID_RE, &HEX_RE, &NUM_RE, &PATH_RE)
                         == *normalized
                 })
-                .map(|s| s.as_str())
-                .unwrap_or(normalized);
+                .map_or(normalized.as_str(), |s| s.as_str());
 
             let truncated = if original.len() > 100 {
                 let t: String = original.chars().take(97).collect();
-                format!("{}...", t)
+                format!("{t}...")
             } else {
                 original.to_string()
             };
 
             if **count > 1 {
-                result.push(format!("   [×{}] {}", count, truncated));
+                result.push(format!("   [×{count}] {truncated}"));
             } else {
-                result.push(format!("   {}", truncated));
+                result.push(format!("   {truncated}"));
             }
         }
 
@@ -225,13 +223,13 @@ mod tests {
 
     #[test]
     fn test_analyze_logs() {
-        let logs = r#"
+        let logs = r"
 2024-01-01 10:00:00 ERROR: Connection failed to /api/server
 2024-01-01 10:00:01 ERROR: Connection failed to /api/server
 2024-01-01 10:00:02 ERROR: Connection failed to /api/server
 2024-01-01 10:00:03 WARN: Retrying connection
 2024-01-01 10:00:04 INFO: Connected
-"#;
+";
         let result = analyze_logs(logs);
         assert!(result.contains("×3"));
         assert!(result.contains("ERRORS"));

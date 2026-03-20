@@ -42,7 +42,7 @@ pub fn format_console_report(
         // Show error snippet (first line only)
         let error_line = rule.example_error.lines().next().unwrap_or("").trim();
         if !error_line.is_empty() {
-            output.push_str(&format!("     Error: {}\n", error_line));
+            output.push_str(&format!("     Error: {error_line}\n"));
         }
     }
 
@@ -85,7 +85,7 @@ pub fn write_rules_file(rules: &[CorrectionRule], path: &str) -> Result<()> {
 
         // Capitalize first letter for section header
         let section_header = capitalize_first(&base_cmd);
-        content.push_str(&format!("## {}\n", section_header));
+        content.push_str(&format!("## {section_header}\n"));
 
         for rule in rules_for_cmd {
             let occurrence_note = if rule.occurrences > 1 {

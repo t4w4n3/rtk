@@ -21,7 +21,7 @@ pub fn maybe_ping() {
     }
 
     // Check opt-out: config.toml
-    if let Some(false) = config::telemetry_enabled() {
+    if config::telemetry_enabled() == Some(false) {
         return;
     }
 
@@ -229,8 +229,7 @@ mod tests {
         let method = detect_install_method();
         assert!(
             ["homebrew", "cargo", "script", "nix", "other", "unknown"].contains(&method),
-            "Unexpected install method: {}",
-            method
+            "Unexpected install method: {method}"
         );
     }
 

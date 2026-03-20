@@ -48,18 +48,18 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let raw = format!("{}\n{}", stdout, stderr);
+    let raw = format!("{stdout}\n{stderr}");
 
     let filtered = filter_pytest_output(&stdout);
 
     let exit_code = output
         .status
         .code()
-        .unwrap_or(if output.status.success() { 0 } else { 1 });
+        .unwrap_or(i32::from(!output.status.success()));
     if let Some(hint) = crate::tee::tee_and_hint(&raw, "pytest", exit_code) {
-        println!("{}\n{}", filtered, hint);
+        println!("{filtered}\n{hint}");
     } else {
-        println!("{}", filtered);
+        println!("{filtered}");
     }
 
     // Include stderr if present (import errors, etc.)
@@ -167,7 +167,7 @@ fn build_pytest_summary(summary: &str, _test_files: &[String], failures: &[Strin
     let (passed, failed, skipped) = parse_summary_line(summary);
 
     if failed == 0 && passed > 0 {
-        return format!("Pytest: {} passed", passed);
+        return format!("Pytest: {passed} passed");
     }
 
     if passed == 0 && failed == 0 {
@@ -175,9 +175,9 @@ fn build_pytest_summary(summary: &str, _test_files: &[String], failures: &[Strin
     }
 
     let mut result = String::new();
-    result.push_str(&format!("Pytest: {} passed, {} failed", passed, failed));
+    result.push_str(&format!("Pytest: {passed} passed, {failed} failed"));
     if skipped > 0 {
-        result.push_str(&format!(", {} skipped", skipped));
+        result.push_str(&format!(", {skipped} skipped"));
     }
     result.push('\n');
     result.push_str("═══════════════════════════════════════\n");
@@ -279,13 +279,13 @@ mod tests {
 
     #[test]
     fn test_filter_pytest_all_pass() {
-        let output = r#"=== test session starts ===
+        let output = r"=== test session starts ===
 platform darwin -- Python 3.11.0
 collected 5 items
 
 tests/test_foo.py .....                                            [100%]
 
-=== 5 passed in 0.50s ==="#;
+=== 5 passed in 0.50s ===";
 
         let result = filter_pytest_output(output);
         assert!(result.contains("Pytest"));
@@ -294,7 +294,7 @@ tests/test_foo.py .....                                            [100%]
 
     #[test]
     fn test_filter_pytest_with_failures() {
-        let output = r#"=== test session starts ===
+        let output = r"=== test session starts ===
 collected 5 items
 
 tests/test_foo.py ..F..                                            [100%]
@@ -310,7 +310,7 @@ tests/test_foo.py:10: AssertionError
 
 === short test summary info ===
 FAILED tests/test_foo.py::test_something - assert False
-=== 4 passed, 1 failed in 0.50s ==="#;
+=== 4 passed, 1 failed in 0.50s ===";
 
         let result = filter_pytest_output(output);
         assert!(result.contains("4 passed, 1 failed"));
@@ -320,7 +320,7 @@ FAILED tests/test_foo.py::test_something - assert False
 
     #[test]
     fn test_filter_pytest_multiple_failures() {
-        let output = r#"=== test session starts ===
+        let output = r"=== test session starts ===
 collected 3 items
 
 tests/test_foo.py FFF                                              [100%]
@@ -336,7 +336,7 @@ E   ValueError: invalid value
 FAILED tests/test_foo.py::test_one - AssertionError: expected 5
 FAILED tests/test_foo.py::test_two - ValueError: invalid value
 FAILED tests/test_foo.py::test_three - KeyError
-=== 3 failed in 0.20s ==="#;
+=== 3 failed in 0.20s ===";
 
         let result = filter_pytest_output(output);
         assert!(result.contains("3 failed"));
@@ -347,10 +347,10 @@ FAILED tests/test_foo.py::test_three - KeyError
 
     #[test]
     fn test_filter_pytest_no_tests() {
-        let output = r#"=== test session starts ===
+        let output = r"=== test session starts ===
 collected 0 items
 
-=== no tests ran in 0.00s ==="#;
+=== no tests ran in 0.00s ===";
 
         let result = filter_pytest_output(output);
         assert!(result.contains("No tests collected"));

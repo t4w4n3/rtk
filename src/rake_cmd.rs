@@ -69,15 +69,15 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let raw = format!("{}\n{}", stdout, stderr);
+    let raw = format!("{stdout}\n{stderr}");
 
     let filtered = filter_minitest_output(&raw);
 
     let exit_code = exit_code_from_output(&output, "rake");
     if let Some(hint) = crate::tee::tee_and_hint(&raw, "rake", exit_code) {
-        println!("{}\n{}", filtered, hint);
+        println!("{filtered}\n{hint}");
     } else {
-        println!("{}", filtered);
+        println!("{filtered}");
     }
 
     if !stderr.trim().is_empty() && verbose > 0 {
@@ -159,7 +159,6 @@ fn filter_minitest_output(output: &str) -> String {
         match state {
             ParseState::Header | ParseState::Running => {
                 // Skip seed line, blank lines, progress dots
-                continue;
             }
             ParseState::Failures => {
                 if is_failure_header(trimmed) {
@@ -203,20 +202,19 @@ fn build_minitest_summary(summary: &str, failures: &[String]) -> String {
     }
 
     if fail_count == 0 && error_count == 0 {
-        let mut msg = format!("ok rake test: {} runs, 0 failures", runs);
+        let mut msg = format!("ok rake test: {runs} runs, 0 failures");
         if skips > 0 {
-            msg.push_str(&format!(", {} skips", skips));
+            msg.push_str(&format!(", {skips} skips"));
         }
         return msg;
     }
 
     let mut result = String::new();
     result.push_str(&format!(
-        "rake test: {} runs, {} failures, {} errors",
-        runs, fail_count, error_count
+        "rake test: {runs} runs, {fail_count} failures, {error_count} errors"
     ));
     if skips > 0 {
-        result.push_str(&format!(", {} skips", skips));
+        result.push_str(&format!(", {skips} skips"));
     }
     result.push('\n');
 
@@ -285,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_filter_minitest_all_pass() {
-        let output = r#"Run options: --seed 12345
+        let output = r"Run options: --seed 12345
 
 # Running:
 
@@ -293,7 +291,7 @@ mod tests {
 
 Finished in 0.123456s, 64.8 runs/s, 72.9 assertions/s.
 
-8 runs, 9 assertions, 0 failures, 0 errors, 0 skips"#;
+8 runs, 9 assertions, 0 failures, 0 errors, 0 skips";
 
         let result = filter_minitest_output(output);
         assert!(result.contains("ok rake test"));
@@ -303,7 +301,7 @@ Finished in 0.123456s, 64.8 runs/s, 72.9 assertions/s.
 
     #[test]
     fn test_filter_minitest_with_failures() {
-        let output = r#"Run options: --seed 54321
+        let output = r"Run options: --seed 54321
 
 # Running:
 
@@ -316,7 +314,7 @@ TestSomething#test_that_fails [/path/to/test.rb:15]:
 Expected: true
   Actual: false
 
-7 runs, 7 assertions, 1 failures, 0 errors, 0 skips"#;
+7 runs, 7 assertions, 1 failures, 0 errors, 0 skips";
 
         let result = filter_minitest_output(output);
         assert!(result.contains("1 failures"));
@@ -326,7 +324,7 @@ Expected: true
 
     #[test]
     fn test_filter_minitest_with_errors() {
-        let output = r#"Run options: --seed 99999
+        let output = r"Run options: --seed 99999
 
 # Running:
 
@@ -339,7 +337,7 @@ TestOther#test_boom [/path/to/test.rb:42]:
 RuntimeError: something went wrong
     /path/to/test.rb:42:in `test_boom'
 
-6 runs, 5 assertions, 0 failures, 1 errors, 0 skips"#;
+6 runs, 5 assertions, 0 failures, 1 errors, 0 skips";
 
         let result = filter_minitest_output(output);
         assert!(result.contains("1 errors"));
@@ -355,7 +353,7 @@ RuntimeError: something went wrong
 
     #[test]
     fn test_filter_minitest_skip() {
-        let output = r#"Run options: --seed 11111
+        let output = r"Run options: --seed 11111
 
 # Running:
 
@@ -363,7 +361,7 @@ RuntimeError: something went wrong
 
 Finished in 0.100000s, 50.0 runs/s
 
-5 runs, 4 assertions, 0 failures, 0 errors, 1 skips"#;
+5 runs, 4 assertions, 0 failures, 0 errors, 1 skips";
 
         let result = filter_minitest_output(output);
         assert!(result.contains("ok rake test"));
@@ -381,10 +379,9 @@ Finished in 0.100000s, 50.0 runs/s
         let output = format!(
             "Run options: --seed 12345\n\n\
              # Running:\n\n\
-             {}\n\
+             {dots}\n\
              Finished in 2.345678s, 213.4 runs/s, 428.7 assertions/s.\n\n\
-             500 runs, 1003 assertions, 0 failures, 0 errors, 0 skips",
-            dots
+             500 runs, 1003 assertions, 0 failures, 0 errors, 0 skips"
         );
 
         let input_tokens = count_tokens(&output);
@@ -394,10 +391,7 @@ Finished in 0.100000s, 50.0 runs/s
         let savings = 100.0 - (output_tokens as f64 / input_tokens as f64 * 100.0);
         assert!(
             savings >= 80.0,
-            "Expected >= 80% savings, got {:.1}% (input: {}, output: {})",
-            savings,
-            input_tokens,
-            output_tokens
+            "Expected >= 80% savings, got {savings:.1}% (input: {input_tokens}, output: {output_tokens})"
         );
     }
 
