@@ -92,7 +92,8 @@ alias = "qa"
 description = "Local quality gate: fmt (auto-fix), then lint + test in parallel"
 run = '''
 cargo fmt --all
-cargo clippy --all-targets -- -D warnings -W clippy::pedantic -W clippy::nursery & cargo test --all & wait
+cargo clippy --all-targets -- -D warnings -W clippy::pedantic -W clippy::nursery
+cargo test --all
 '''
 alias = "d"
 
