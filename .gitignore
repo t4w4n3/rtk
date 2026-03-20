@@ -49,3 +49,6 @@ claudedocs
 
 # Claude Code
 settings.json
+
+# Local files
+*.local.*
