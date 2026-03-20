@@ -1,45 +1,6 @@
 use crate::tracking;
 use anyhow::{Context, Result};
 
-/// Commands RTK can proxy — shim scripts are created for each of these.
-/// Keep in sync with the Commands enum in main.rs.
-const RTK_PROXIED_COMMANDS: &[&str] = &[
-    "ls",
-    "tree",
-    "git",
-    "gh",
-    "grep",
-    "find",
-    "diff",
-    "wc",
-    "wget",
-    "curl",
-    "npm",
-    "npx",
-    "pnpm",
-    "cargo",
-    "aws",
-    "psql",
-    "docker",
-    "kubectl",
-    "vitest",
-    "prisma",
-    "tsc",
-    "next",
-    "prettier",
-    "playwright",
-    "ruff",
-    "pytest",
-    "pip",
-    "go",
-    "golangci-lint",
-    "rake",
-    "rspec",
-    "rubocop",
-    "dotnet",
-    "gt",
-];
-
 /// Create a directory of shim scripts, one per RTK-proxied command.
 /// Each shim: `#!/bin/sh\nexec /path/to/rtk <cmd> "$@"`.
 /// Prepend this dir to PATH before running mise so that any command
@@ -48,7 +9,7 @@ fn create_rtk_shims(dir: &std::path::Path) -> Result<()> {
     let rtk_bin = std::env::current_exe().context("Failed to resolve current exe path")?;
     let rtk_path = rtk_bin.to_string_lossy();
 
-    for &cmd in RTK_PROXIED_COMMANDS {
+    for cmd in crate::discover::rules::shimable_binaries() {
         let shim = dir.join(cmd);
         let content = format!("#!/bin/sh\nexec {rtk_path} {cmd} \"$@\"\n");
         std::fs::write(&shim, content)
@@ -85,9 +46,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     let original_path = std::env::var("PATH").unwrap_or_default();
     let shim_dir = tempfile::tempdir().context("Failed to create shim tmpdir")?;
     let injected_path = match create_rtk_shims(shim_dir.path()) {
-        Ok(()) => {
-            Some(format!("{}:{original_path}", shim_dir.path().display()))
-        }
+        Ok(()) => Some(format!("{}:{original_path}", shim_dir.path().display())),
         Err(e) => {
             if verbose > 0 {
                 eprintln!("rtk mise: shim creation failed ({e}), running unfiltered");

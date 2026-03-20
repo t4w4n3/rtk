@@ -653,6 +653,28 @@ pub const RULES: &[RtkRule] = &[
     },
 ];
 
+/// Returns the unique set of binary names that RTK can directly shim.
+///
+/// A prefix is "shimable" when its first word equals the RTK subcommand name,
+/// which makes `exec rtk <binary> "$@"` a valid shim script.
+/// Prefixes like `"cat"` (maps to `rtk read`) or `"rg"` (maps to `rtk grep`)
+/// are intentionally excluded.
+pub fn shimable_binaries() -> Vec<&'static str> {
+    let mut seen = std::collections::HashSet::new();
+    let mut result = Vec::new();
+    for rule in RULES {
+        let rtk_subcmd = rule.rtk_cmd.split_whitespace().nth(1).unwrap_or("");
+        for prefix in rule.rewrite_prefixes {
+            if let Some(first_word) = prefix.split_whitespace().next() {
+                if first_word == rtk_subcmd && seen.insert(first_word) {
+                    result.push(first_word);
+                }
+            }
+        }
+    }
+    result
+}
+
 /// Commands to ignore (shell builtins, trivial, already rtk).
 pub const IGNORED_PREFIXES: &[&str] = &[
     "cd ",
